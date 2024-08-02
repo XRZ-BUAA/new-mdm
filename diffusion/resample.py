@@ -4,7 +4,10 @@ import numpy as np
 import torch as th
 import torch.distributed as dist
 
-
+'''
+From XRZ:
+不用改
+'''
 def create_named_schedule_sampler(name, diffusion):
     """
     Create a ScheduleSampler from a library of pre-defined samplers.

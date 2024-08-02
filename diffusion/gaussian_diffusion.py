@@ -275,7 +275,7 @@ class GaussianDiffusion:
         return posterior_mean, posterior_variance, posterior_log_variance_clipped
 
     def p_mean_variance(
-        self, model, x, t, clip_denoised=True, denoised_fn=None, model_kwargs=None
+        self, model, x, t, full, sparse, clip_denoised=True, denoised_fn=None, model_kwargs=None
     ):
         """
         Apply the model to get p(x_{t-1} | x_t), as well as a prediction of
@@ -285,6 +285,8 @@ class GaussianDiffusion:
                       as input.
         :param x: the [N x C x ...] tensor at time t.
         :param t: a 1-D Tensor of timesteps.
+        :param full:
+        :param sparse
         :param clip_denoised: if True, clip the denoised signal into [-1, 1].
         :param denoised_fn: if not None, a function which applies to the
             x_start prediction before it is used to sample. Applies before
@@ -302,16 +304,14 @@ class GaussianDiffusion:
 
         B, C = x.shape[:2]
         assert t.shape == (B,)
-        model_output = model(x, self._scale_timesteps(t), **model_kwargs)
+        # 改
+        model_output = model(x, self._scale_timesteps(t), full, sparse, **model_kwargs)
 
         if 'inpainting_mask' in model_kwargs['y'].keys() and 'inpainted_motion' in model_kwargs['y'].keys():
             inpainting_mask, inpainted_motion = model_kwargs['y']['inpainting_mask'], model_kwargs['y']['inpainted_motion']
             assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for mow!'
             assert model_output.shape == inpainting_mask.shape == inpainted_motion.shape
             model_output = (model_output * ~inpainting_mask) + (inpainted_motion * inpainting_mask)
-            # print('model_output', model_output.shape, model_output)
-            # print('inpainting_mask', inpainting_mask.shape, inpainting_mask[0,0,0,:])
-            # print('inpainted_motion', inpainted_motion.shape, inpainted_motion)
 
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
             assert model_output.shape == (B, C * 2, *x.shape[2:])
@@ -341,12 +341,6 @@ class GaussianDiffusion:
                     self.posterior_log_variance_clipped,
                 ),
             }[self.model_var_type]
-            # print('model_variance', model_variance)
-            # print('model_log_variance',model_log_variance)
-            # print('self.posterior_variance', self.posterior_variance)
-            # print('self.posterior_log_variance_clipped', self.posterior_log_variance_clipped)
-            # print('self.model_var_type', self.model_var_type)
-
 
             model_variance = _extract_into_tensor(model_variance, t, x.shape)
             model_log_variance = _extract_into_tensor(model_log_variance, t, x.shape)
@@ -498,6 +492,8 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        full,
+        sparse,
         clip_denoised=True,
         denoised_fn=None,
         cond_fn=None,
@@ -510,6 +506,8 @@ class GaussianDiffusion:
         :param model: the model to sample from.
         :param x: the current tensor at x_{t-1}.
         :param t: the value of t, starting at 0 for the first diffusion step.
+        :param full:
+        :param sparse:
         :param clip_denoised: if True, clip the x_start prediction to [-1, 1].
         :param denoised_fn: if not None, a function which applies to the
             x_start prediction before it is used to sample.
@@ -521,10 +519,13 @@ class GaussianDiffusion:
                  - 'sample': a random sample from the model.
                  - 'pred_xstart': a prediction of x_0.
         """
+        # 改
         out = self.p_mean_variance(
             model,
             x,
             t,
+            full,
+            sparse,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
             model_kwargs=model_kwargs,
@@ -552,6 +553,8 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        full,
+        sparse,
         clip_denoised=True,
         denoised_fn=None,
         cond_fn=None,
@@ -563,6 +566,8 @@ class GaussianDiffusion:
         :param model: the model to sample from.
         :param x: the current tensor at x_{t-1}.
         :param t: the value of t, starting at 0 for the first diffusion step.
+        :param full:
+        :param sparse:
         :param clip_denoised: if True, clip the x_start prediction to [-1, 1].
         :param denoised_fn: if not None, a function which applies to the
             x_start prediction before it is used to sample.
@@ -576,10 +581,13 @@ class GaussianDiffusion:
         """
         with th.enable_grad():
             x = x.detach().requires_grad_()
+            # 改
             out = self.p_mean_variance(
                 model,
                 x,
                 t,
+                full,
+                sparse,
                 clip_denoised=clip_denoised,
                 denoised_fn=denoised_fn,
                 model_kwargs=model_kwargs,
@@ -599,6 +607,8 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        full=None,
+        sparse=None,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -618,6 +628,8 @@ class GaussianDiffusion:
 
         :param model: the model module.
         :param shape: the shape of the samples, (N, C, H, W).
+        :param full:
+        :param sparse:
         :param noise: if specified, the noise from the encoder to sample.
                       Should be of the same shape as `shape`.
         :param clip_denoised: if True, clip x_start predictions to [-1, 1].
@@ -637,13 +649,12 @@ class GaussianDiffusion:
         if dump_steps is not None:
             dump = []
 
-        if 'text' in model_kwargs['y'].keys():
-            # encoding once instead of each iteration saves lots of time
-            model_kwargs['y']['text_embed'] = model.encode_text(model_kwargs['y']['text'])
-        
+        # 改
         for i, sample in enumerate(self.p_sample_loop_progressive(
             model,
             shape,
+            full=full,
+            sparse=sparse,
             noise=noise,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
@@ -668,6 +679,8 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        full=None,
+        sparse=None,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -720,10 +733,13 @@ class GaussianDiffusion:
                                                device=model_kwargs['y'].device)
             with th.no_grad():
                 sample_fn = self.p_sample_with_grad if cond_fn_with_grad else self.p_sample
+                # 改
                 out = sample_fn(
                     model,
                     img,
                     t,
+                    full,
+                    sparse,
                     clip_denoised=clip_denoised,
                     denoised_fn=denoised_fn,
                     cond_fn=cond_fn,
@@ -738,6 +754,8 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        full,
+        sparse,
         clip_denoised=True,
         denoised_fn=None,
         cond_fn=None,
@@ -749,10 +767,13 @@ class GaussianDiffusion:
 
         Same usage as p_sample().
         """
+        # 改
         out_orig = self.p_mean_variance(
             model,
             x,
             t,
+            full,
+            sparse,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
             model_kwargs=model_kwargs,
@@ -790,6 +811,8 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        full,
+        sparse,
         clip_denoised=True,
         denoised_fn=None,
         cond_fn=None,
@@ -803,10 +826,13 @@ class GaussianDiffusion:
         """
         with th.enable_grad():
             x = x.detach().requires_grad_()
+            # 改
             out_orig = self.p_mean_variance(
                 model,
                 x,
                 t,
+                full,
+                sparse,
                 clip_denoised=clip_denoised,
                 denoised_fn=denoised_fn,
                 model_kwargs=model_kwargs,
@@ -847,6 +873,8 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        full,
+        sparse,
         clip_denoised=True,
         denoised_fn=None,
         model_kwargs=None,
@@ -856,10 +884,13 @@ class GaussianDiffusion:
         Sample x_{t+1} from the model using DDIM reverse ODE.
         """
         assert eta == 0.0, "Reverse ODE only for deterministic path"
+        # 改
         out = self.p_mean_variance(
             model,
             x,
             t,
+            full,
+            sparse,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
             model_kwargs=model_kwargs,
@@ -884,6 +915,8 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        full=None,
+        sparse=None,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -910,9 +943,12 @@ class GaussianDiffusion:
             raise NotImplementedError()
 
         final = None
+        # 改
         for sample in self.ddim_sample_loop_progressive(
             model,
             shape,
+            full=full,
+            sparse=sparse,
             noise=noise,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
@@ -933,6 +969,8 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        full=None,
+        sparse=None,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -977,16 +1015,23 @@ class GaussianDiffusion:
 
         for i in indices:
             t = th.tensor([i] * shape[0], device=device)
+            '''
+            下面的这个判断语句，AGRoL里没有，我也看不懂这什么，暂时不删它
+            '''
             if randomize_class and 'y' in model_kwargs:
                 model_kwargs['y'] = th.randint(low=0, high=model.num_classes,
                                                size=model_kwargs['y'].shape,
                                                device=model_kwargs['y'].device)
+
             with th.no_grad():
                 sample_fn = self.ddim_sample_with_grad if cond_fn_with_grad else self.ddim_sample
+                # 改
                 out = sample_fn(
                     model,
                     img,
                     t,
+                    full,
+                    sparse,
                     clip_denoised=clip_denoised,
                     denoised_fn=denoised_fn,
                     cond_fn=cond_fn,
@@ -1001,6 +1046,8 @@ class GaussianDiffusion:
         model,
         x,
         t,
+        full=None,
+        sparse=None,
         clip_denoised=True,
         denoised_fn=None,
         cond_fn=None,
@@ -1020,10 +1067,13 @@ class GaussianDiffusion:
         def get_model_output(x, t):
             with th.set_grad_enabled(cond_fn_with_grad and cond_fn is not None):
                 x = x.detach().requires_grad_() if cond_fn_with_grad else x
+                # 改
                 out_orig = self.p_mean_variance(
                     model,
                     x,
                     t,
+                    full,
+                    sparse,
                     clip_denoised=clip_denoised,
                     denoised_fn=denoised_fn,
                     model_kwargs=model_kwargs,
@@ -1042,7 +1092,7 @@ class GaussianDiffusion:
             eps = self._predict_eps_from_xstart(x, t, out["pred_xstart"])
             return eps, out, out_orig
 
-        alpha_bar = _extract_into_tensor(self.alphas_cumprod, t, x.shape)
+        alpha_bar = _extract_into_tensor(self.alphas_cumprod, t, x.shape)   # 这句 AGRoL 好像没有，暂时我也不知道这是干啥的
         alpha_bar_prev = _extract_into_tensor(self.alphas_cumprod_prev, t, x.shape)
         eps, out, out_orig = get_model_output(x, t)
 
@@ -1084,6 +1134,8 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        full=None,
+        sparse=None,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -1103,9 +1155,12 @@ class GaussianDiffusion:
         Same usage as p_sample_loop().
         """
         final = None
+        # 改
         for sample in self.plms_sample_loop_progressive(
             model,
             shape,
+            full=full,
+            sparse=sparse,
             noise=noise,
             clip_denoised=clip_denoised,
             denoised_fn=denoised_fn,
@@ -1126,6 +1181,8 @@ class GaussianDiffusion:
         self,
         model,
         shape,
+        full=None,
+        sparse=None,
         noise=None,
         clip_denoised=True,
         denoised_fn=None,
@@ -1181,6 +1238,8 @@ class GaussianDiffusion:
                     model,
                     img,
                     t,
+                    full=full,
+                    sparse=sparse,
                     clip_denoised=clip_denoised,
                     denoised_fn=denoised_fn,
                     cond_fn=cond_fn,
@@ -1194,7 +1253,7 @@ class GaussianDiffusion:
                 img = out["sample"]
 
     def _vb_terms_bpd(
-        self, model, x_start, x_t, t, clip_denoised=True, model_kwargs=None
+        self, model, x_start, x_t, t, full=None, sparse=None, clip_denoised=True, model_kwargs=None
     ):
         """
         Get a term for the variational lower-bound.
@@ -1209,8 +1268,9 @@ class GaussianDiffusion:
         true_mean, _, true_log_variance_clipped = self.q_posterior_mean_variance(
             x_start=x_start, x_t=x_t, t=t
         )
+        # 改
         out = self.p_mean_variance(
-            model, x_t, t, clip_denoised=clip_denoised, model_kwargs=model_kwargs
+            model, x_t, t, full=full, sparse=sparse,clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
         kl = normal_kl(
             true_mean, true_log_variance_clipped, out["mean"], out["log_variance"]
@@ -1228,13 +1288,16 @@ class GaussianDiffusion:
         output = th.where((t == 0), decoder_nll, kl)
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
-    def training_losses(self, model, x_start, t, model_kwargs=None, noise=None, dataset=None):
+    # 这个函数 AGRoL 中的实现略有不同，但我暂时觉得按这个来
+    def training_losses(self, model, x_start, t, full, sparse, model_kwargs=None, noise=None, dataset=None):
         """
         Compute training losses for a single timestep.
 
         :param model: the model to evaluate loss on.
         :param x_start: the [N x C x ...] tensor of inputs.
         :param t: a batch of timestep indices.
+        :param full:
+        :param sparse:
         :param model_kwargs: if not None, a dict of extra keyword arguments to
             pass to the model. This can be used for conditioning.
         :param noise: if specified, the specific Gaussian noise to try to remove.
@@ -1271,7 +1334,7 @@ class GaussianDiffusion:
             if self.loss_type == LossType.RESCALED_KL:
                 terms["loss"] *= self.num_timesteps
         elif self.loss_type == LossType.MSE or self.loss_type == LossType.RESCALED_MSE:
-            model_output = model(x_t, self._scale_timesteps(t), **model_kwargs)
+            model_output = model(x_t, self._scale_timesteps(t), full, sparse, **model_kwargs)
 
             if self.model_var_type in [
                 ModelVarType.LEARNED,

@@ -1,60 +1,54 @@
-from model.mdm import MDM
+# MIT License
+# Copyright (c) 2022 Guy Tevet
+#
+# This code is based on https://github.com/GuyTevet/motion-diffusion-model
+# Copyright (c) Meta Platforms, Inc. All Rights Reserved
+
 from diffusion import gaussian_diffusion as gd
-from diffusion.respace import SpacedDiffusion, space_timesteps
-from utils.parser_util import get_cond_mode
+from diffusion.respace import space_timesteps, SpacedDiffusion
+from model.meta_model import MetaModel
 
 
 def load_model_wo_clip(model, state_dict):
     missing_keys, unexpected_keys = model.load_state_dict(state_dict, strict=False)
+    if len(unexpected_keys) != 0:
+        state_dict_new = {}
+        for key in state_dict.keys():
+            state_dict_new[key.replace("module.", "")] = state_dict[key]
+        missing_keys, unexpected_keys = model.load_state_dict(
+            state_dict_new, strict=False
+        )
     assert len(unexpected_keys) == 0
-    assert all([k.startswith('clip_model.') for k in missing_keys])
+    assert all([k.startswith("clip_model.") for k in missing_keys])
 
 
-def create_model_and_diffusion(args, data):
-    model = MDM(**get_model_args(args, data))
+def create_model_and_diffusion(args):
+    model = MetaModel(**get_model_args(args))
     diffusion = create_gaussian_diffusion(args)
     return model, diffusion
 
 
-def get_model_args(args, data):
+def get_model_args(args):
 
-    # default args
-    clip_version = 'ViT-B/32'
-    action_emb = 'tensor'
-    cond_mode = get_cond_mode(args)
-    if hasattr(data.dataset, 'num_actions'):
-        num_actions = data.dataset.num_actions
-    else:
-        num_actions = 1
-
-    # SMPL defaults
-    data_rep = 'rot6d'
-    njoints = 25
-    nfeats = 6
-
-    if args.dataset == 'humanml':
-        data_rep = 'hml_vec'
-        njoints = 263
-        nfeats = 1
-    elif args.dataset == 'kit':
-        data_rep = 'hml_vec'
-        njoints = 251
-        nfeats = 1
-
-    return {'modeltype': '', 'njoints': njoints, 'nfeats': nfeats, 'num_actions': num_actions,
-            'translation': True, 'pose_rep': 'rot6d', 'glob': True, 'glob_rot': True,
-            'latent_dim': args.latent_dim, 'ff_size': 1024, 'num_layers': args.layers, 'num_heads': 4,
-            'dropout': 0.1, 'activation': "gelu", 'data_rep': data_rep, 'cond_mode': cond_mode,
-            'cond_mask_prob': args.cond_mask_prob, 'action_emb': action_emb, 'arch': args.arch,
-            'emb_trans_dec': args.emb_trans_dec, 'clip_version': clip_version, 'dataset': args.dataset}
+    return {
+        "arch": args.arch,
+        "nfeats": args.motion_nfeat,
+        "latent_dim": args.latent_dim,
+        "motion_dim": args.motion_dim, # 包含冗余信息的全身动作特征（24个关节点）维度
+        "sparse_dim": args.sparse_dim,
+        "num_layers": args.layers,
+        "dropout": 0.1,
+        "cond_mask_prob": args.cond_mask_prob,
+        "dataset": args.dataset,
+        "input_motion_length": args.input_motion_length,
+    }
 
 
 def create_gaussian_diffusion(args):
-    # default params
-    predict_xstart = True  # we always predict x_start (a.k.a. x0), that's our deal!
-    steps = args.diffusion_steps
-    scale_beta = 1.  # no scaling
-    timestep_respacing = ''  # can be used for ddim sampling, we don't use it.
+    predict_xstart = True
+    steps = args.diffusion_steps  # 1000
+    scale_beta = 1.0
+    timestep_respacing = args.timestep_respacing
     learn_sigma = False
     rescale_timesteps = False
 
@@ -65,6 +59,7 @@ def create_gaussian_diffusion(args):
         timestep_respacing = [steps]
 
     return SpacedDiffusion(
+        dataset=args.dataset,
         use_timesteps=space_timesteps(steps, timestep_respacing),
         betas=betas,
         model_mean_type=(
@@ -81,6 +76,7 @@ def create_gaussian_diffusion(args):
         ),
         loss_type=loss_type,
         rescale_timesteps=rescale_timesteps,
+        # 与损失有关的参数
         lambda_vel=args.lambda_vel,
         lambda_rcxyz=args.lambda_rcxyz,
         lambda_fc=args.lambda_fc,

@@ -3,6 +3,10 @@
 Various utilities for neural networks.
 """
 
+'''
+From XRZ:
+AGRoL里没有
+'''
 import math
 
 import torch as th

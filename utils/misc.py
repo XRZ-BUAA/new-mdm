@@ -32,6 +32,7 @@ def load_model_wo_clip(model, state_dict):
     assert len(unexpected_keys) == 0
     assert all([k.startswith('clip_model.') for k in missing_keys])
 
+
 def freeze_joints(x, joints_to_freeze):
     # Freezes selected joint *rotations* as they appear in the first frame
     # x [bs, [root+n_joints], joint_dim(6), seqlen]

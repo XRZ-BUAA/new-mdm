@@ -5,6 +5,10 @@ Ho et al. diffusion models codebase:
 https://github.com/hojonathanho/diffusion/blob/1e0dceb3b3495bbe19116a5e1b3596cd0706c543/diffusion_tf/utils.py
 """
 
+'''
+From XRZ:
+不用改
+'''
 import numpy as np
 import torch as th
 
