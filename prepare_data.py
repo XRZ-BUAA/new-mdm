@@ -63,8 +63,11 @@ def main(args, bm):
                         bdata_poses[:, :3]
                     ),  # .to(comp_device), # controls the global root orientation
                     "pose_body": torch.Tensor(
-                        bdata_poses[:, 3:72]    # 应该是要取出23个关节点的pose参数
+                        bdata_poses[:, 3:66]    # 应该是要取出21个关节点的pose参数
                     ),  # .to(comp_device), # controls the body
+                    "pose_hand": torch.Tensor(
+                        bdata_poses[:, 66:72]   # 两手关节点
+                    ),
                     "trans": torch.Tensor(
                         bdata_trans
                     ),  # .to(comp_device), # controls the global body position
@@ -76,11 +79,11 @@ def main(args, bm):
                     **{
                         k: v
                         for k, v in body_parms.items()
-                        if k in ["pose_body", "root_orient", "trans"]
+                        if k in ["pose_body", "pose_hand", "root_orient", "trans"]
                     }
                 )
 
-                output_aa = torch.Tensor(bdata_poses[:, :66]).reshape(-1, 3)
+                output_aa = torch.Tensor(bdata_poses[:, :72]).reshape(-1, 3)
                 output_6d = utils_transform.aa2sixd(output_aa).reshape(
                     bdata_poses.shape[0], -1
                 )
