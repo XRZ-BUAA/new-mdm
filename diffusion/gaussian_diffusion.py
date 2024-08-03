@@ -122,6 +122,7 @@ class GaussianDiffusion:
     def __init__(
         self,
         *,
+        dataset,    # 超，鬼晓得这是干嘛的
         betas,
         model_mean_type,
         model_var_type,
@@ -137,6 +138,7 @@ class GaussianDiffusion:
         lambda_vel_rcxyz=0.,
         lambda_fc=0.,
     ):
+        self.dataset = dataset
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
         self.loss_type = loss_type
