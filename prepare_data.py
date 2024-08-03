@@ -169,8 +169,8 @@ def main(args, bm):
                 )
 
                 # debug
-                print(rotation_global_6d[1:, 22:52, :])
-                
+                # print(rotation_global_6d[1:, 22:52, :])
+
                 data["rotation_local_full_gt_list"] = rotation_local_full_gt_list
                 # XRZ
                 data["transform_global_full_gt_list"] = transform_global_full_gt_list
