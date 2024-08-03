@@ -66,7 +66,7 @@ def main(args, bm):
                         bdata_poses[:, 3:66]    # 应该是要取出21个关节点的pose参数
                     ),  # .to(comp_device), # controls the body
                     "pose_hand": torch.Tensor(
-                        bdata_poses[:, 66:72]   # 两手关节点
+                        bdata_poses[:, 66:156]   # 两手关节点
                     ),
                     "trans": torch.Tensor(
                         bdata_trans
@@ -83,7 +83,7 @@ def main(args, bm):
                     }
                 )
 
-                output_aa = torch.Tensor(bdata_poses[:, :72]).reshape(-1, 3)
+                output_aa = torch.Tensor(bdata_poses[:, :156]).reshape(-1, 3)
                 output_6d = utils_transform.aa2sixd(output_aa).reshape(
                     bdata_poses.shape[0], -1
                 )
@@ -101,7 +101,7 @@ def main(args, bm):
                 rotation_global_6d = utils_transform.matrot2sixd(
                     rotation_global_matrot.reshape(-1, 3, 3)
                 ).reshape(rotation_global_matrot.shape[0], -1, 6)
-                input_rotation_global_6d = rotation_global_6d[1:, [15, 20, 21, 22, 23], :]
+                input_rotation_global_6d = rotation_global_6d[1:, [15, 20, 21], :]
 
                 rotation_velocity_global_matrot = torch.matmul(
                     torch.inverse(rotation_global_matrot[:-1]),
@@ -111,12 +111,11 @@ def main(args, bm):
                     rotation_velocity_global_matrot.reshape(-1, 3, 3)
                 ).reshape(rotation_velocity_global_matrot.shape[0], -1, 6)
                 input_rotation_velocity_global_6d = rotation_velocity_global_6d[
-                    :, [15, 20, 21, 22, 23], :
+                    :, [15, 20, 21], :
                 ]
 
-                # 新增两个关节点
                 position_global_full_gt_world = body_pose_world.Jtr[
-                    :, :24, :
+                    :, :52, :
                 ]  # position of joints relative to the world origin
 
                 position_head_world = position_global_full_gt_world[
@@ -133,43 +132,45 @@ def main(args, bm):
 
                 num_frames = position_global_full_gt_world.shape[0] - 1
 
-                # 全身24个关节点的信号
+                # 全身22个关节点+两手30个关节点
                 transform_global_full_gt_list = torch.cat(
                     [
-                        rotation_global_6d[1:, :24, :].reshape(num_frames, -1),
-                        rotation_velocity_global_6d[:, :24, :].reshape(num_frames, -1),
-                        position_global_full_gt_world[1:, :24, :].reshape(
+                        rotation_global_6d[1:, :52, :].reshape(num_frames, -1),
+                        rotation_velocity_global_6d[:, :52, :].reshape(num_frames, -1),
+                        position_global_full_gt_world[1:, :52, :].reshape(
                             num_frames, -1
                         ),
-                        position_global_full_gt_world[1:, :24, :].reshape(
+                        position_global_full_gt_world[1:, :52, :].reshape(
                             num_frames, -1
                         )
-                        - position_global_full_gt_world[:-1, :24, :].reshape(
+                        - position_global_full_gt_world[:-1, :52, :].reshape(
                             num_frames, -1
                         ),
                     ],
                     dim=-1,
                 )
 
-                # 5个关节点的稀疏信号
-                # 增加两个手部关节点
+                # 3个关节点的稀疏信号
                 hmd_position_global_full_gt_list = torch.cat(
                     [
                         input_rotation_global_6d.reshape(num_frames, -1),
                         input_rotation_velocity_global_6d.reshape(num_frames, -1),
-                        position_global_full_gt_world[1:, [15, 20, 21, 22, 23], :].reshape(
+                        position_global_full_gt_world[1:, [15, 20, 21], :].reshape(
                             num_frames, -1
                         ),
-                        position_global_full_gt_world[1:, [15, 20, 21, 22, 23], :].reshape(
+                        position_global_full_gt_world[1:, [15, 20, 21], :].reshape(
                             num_frames, -1
                         )
-                        - position_global_full_gt_world[:-1, [15, 20, 21, 22, 23], :].reshape(
+                        - position_global_full_gt_world[:-1, [15, 20, 21], :].reshape(
                             num_frames, -1
                         ),
                     ],
                     dim=-1,
                 )
 
+                # debug
+                print(rotation_global_6d[1:, 22:52, :])
+                
                 data["rotation_local_full_gt_list"] = rotation_local_full_gt_list
                 # XRZ
                 data["transform_global_full_gt_list"] = transform_global_full_gt_list
