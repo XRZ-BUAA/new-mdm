@@ -1,13 +1,9 @@
 import json
 import os
-import random
-
-import numpy as np
 
 import torch
 
 from data_loaders.dataloader import get_dataloader, load_data, TrainDataset
-from model.networks import PureMLP
 from train.training_loop import TrainLoop
 
 from utils import dist_util

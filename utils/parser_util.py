@@ -117,7 +117,7 @@ def add_model_options(parser):
 
     # Copy from AGRoL
     group.add_argument(
-        "--motion_nfeat", default=132, type=int, help="motion feature dimension"
+        "--motion_nfeat", default=312, type=int, help="motion feature dimension"
     )
     # 稀疏信号新增手部两个关节点
     group.add_argument(
