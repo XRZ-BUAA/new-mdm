@@ -22,7 +22,7 @@ class TrainDataset(Dataset):
         mean,
         std,
         motions,
-        fulls, # 包含冗余信息的全身动作特征（24个关节点）
+        fulls,  # 包含冗余信息的全身动作特征（24个关节点）
         sparses,    # mean ... sparses 是 load_data() 的返回值
         input_motion_length=14, # 参数输入，暂定默认输入长度为14
         train_dataset_repeat_times=1,   # 参数输入
@@ -68,9 +68,9 @@ class TrainDataset(Dataset):
             idx = 0
         else:
             idx = torch.randint(0, int(seqlen - self.input_motion_length), (1,))[0]
-        motion = motion[idx : idx + self.input_motion_length]
+        motion = motion[idx: idx + self.input_motion_length]
         # 前7帧的全身特征
-        full = full[idx : idx + self.input_motion_length / 2]
+        full = full[idx: idx + self.input_motion_length / 2]
         # 当前帧的稀疏信号
         sparse = sparse[idx + self.input_motion_length / 2]
 
@@ -231,6 +231,7 @@ def load_data(dataset, dataset_path, split, **kwargs):
     new_fulls = []
 
     new_sparses = []
+
     for idx, motion in enumerate(motions):
         if motion.shape[0] < input_motion_length:  # Arbitrary choice
             continue

@@ -17,6 +17,8 @@ from diffusion.nn import mean_flat, sum_flat
 from diffusion.losses import normal_kl, discretized_gaussian_log_likelihood
 from data_loaders.humanml.scripts import motion_process
 
+from model.rotation2xyz import Rotation2xyz
+
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps, scale_betas=1.):
     """
     Get a pre-defined beta schedule for the given name.
@@ -1298,6 +1300,7 @@ class GaussianDiffusion:
         :param t: a batch of timestep indices.
         :param full:
         :param sparse:
+        :param head: 用于得到关节点全局位置从而计算损失
         :param model_kwargs: if not None, a dict of extra keyword arguments to
             pass to the model. This can be used for conditioning.
         :param noise: if specified, the specific Gaussian noise to try to remove.
@@ -1306,10 +1309,11 @@ class GaussianDiffusion:
         """
 
         # enc = model.model._modules['module']
-        enc = model.model
+        rot_to_xyz = Rotation2xyz(x_start.device)
         mask = model_kwargs['y']['mask']
-        get_xyz = lambda sample: enc.rot2xyz(sample, mask=None, pose_rep=enc.pose_rep, translation=enc.translation,
-                                             glob=enc.glob,
+
+        get_xyz = lambda sample: rot_to_xyz(sample, mask=None, pose_rep='rot6d', translation=True,
+                                             glob=True,
                                              # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
                                              jointstype='smpl',  # 3.4 iter/sec
                                              vertstrans=False)
@@ -1369,6 +1373,7 @@ class GaussianDiffusion:
 
             terms["rot_mse"] = self.masked_l2(target, model_output, mask) # mean_flat(rot_mse)
 
+            # 从这里开始AGRoL就没抄了
             target_xyz, model_output_xyz = None, None
 
             if self.lambda_rcxyz > 0.:
@@ -1377,30 +1382,30 @@ class GaussianDiffusion:
                 terms["rcxyz_mse"] = self.masked_l2(target_xyz, model_output_xyz, mask)  # mean_flat((target_xyz - model_output_xyz) ** 2)
 
             if self.lambda_vel_rcxyz > 0.:
-                if self.data_rep == 'rot6d' and dataset.dataname in ['humanact12', 'uestc']:
-                    target_xyz = get_xyz(target) if target_xyz is None else target_xyz
-                    model_output_xyz = get_xyz(model_output) if model_output_xyz is None else model_output_xyz
-                    target_xyz_vel = (target_xyz[:, :, :, 1:] - target_xyz[:, :, :, :-1])
-                    model_output_xyz_vel = (model_output_xyz[:, :, :, 1:] - model_output_xyz[:, :, :, :-1])
-                    terms["vel_xyz_mse"] = self.masked_l2(target_xyz_vel, model_output_xyz_vel, mask[:, :, :, 1:])
+                target_xyz = get_xyz(target) if target_xyz is None else target_xyz
+                model_output_xyz = get_xyz(model_output) if model_output_xyz is None else model_output_xyz
+                target_xyz_vel = (target_xyz[:, :, :, 1:] - target_xyz[:, :, :, :-1])
+                model_output_xyz_vel = (model_output_xyz[:, :, :, 1:] - model_output_xyz[:, :, :, :-1])
+                terms["vel_xyz_mse"] = self.masked_l2(target_xyz_vel, model_output_xyz_vel, mask[:, :, :, 1:])
 
             if self.lambda_fc > 0.:
                 torch.autograd.set_detect_anomaly(True)
-                if self.data_rep == 'rot6d' and dataset.dataname in ['humanact12', 'uestc']:
-                    target_xyz = get_xyz(target) if target_xyz is None else target_xyz
-                    model_output_xyz = get_xyz(model_output) if model_output_xyz is None else model_output_xyz
-                    # 'L_Ankle',  # 7, 'R_Ankle',  # 8 , 'L_Foot',  # 10, 'R_Foot',  # 11
-                    l_ankle_idx, r_ankle_idx, l_foot_idx, r_foot_idx = 7, 8, 10, 11
-                    relevant_joints = [l_ankle_idx, l_foot_idx, r_ankle_idx, r_foot_idx]
-                    gt_joint_xyz = target_xyz[:, relevant_joints, :, :]  # [BatchSize, 4, 3, Frames]
-                    gt_joint_vel = torch.linalg.norm(gt_joint_xyz[:, :, :, 1:] - gt_joint_xyz[:, :, :, :-1], axis=2)  # [BatchSize, 4, Frames]
-                    fc_mask = torch.unsqueeze((gt_joint_vel <= 0.01), dim=2).repeat(1, 1, 3, 1)
-                    pred_joint_xyz = model_output_xyz[:, relevant_joints, :, :]  # [BatchSize, 4, 3, Frames]
-                    pred_vel = pred_joint_xyz[:, :, :, 1:] - pred_joint_xyz[:, :, :, :-1]
-                    pred_vel[~fc_mask] = 0
-                    terms["fc"] = self.masked_l2(pred_vel,
-                                                 torch.zeros(pred_vel.shape, device=pred_vel.device),
-                                                 mask[:, :, :, 1:])
+                target_xyz = get_xyz(target) if target_xyz is None else target_xyz
+                model_output_xyz = get_xyz(model_output) if model_output_xyz is None else model_output_xyz
+                # 'L_Ankle',  # 7, 'R_Ankle',  # 8 , 'L_Foot',  # 10, 'R_Foot',  # 11
+                l_ankle_idx, r_ankle_idx, l_foot_idx, r_foot_idx = 7, 8, 10, 11
+                relevant_joints = [l_ankle_idx, l_foot_idx, r_ankle_idx, r_foot_idx]
+                gt_joint_xyz = target_xyz[:, relevant_joints, :, :]  # [BatchSize, 4, 3, Frames]
+                gt_joint_vel = torch.linalg.norm(gt_joint_xyz[:, :, :, 1:] - gt_joint_xyz[:, :, :, :-1],
+                                                 axis=2)  # [BatchSize, 4, Frames]
+                fc_mask = torch.unsqueeze((gt_joint_vel <= 0.01), dim=2).repeat(1, 1, 3, 1)
+                pred_joint_xyz = model_output_xyz[:, relevant_joints, :, :]  # [BatchSize, 4, 3, Frames]
+                pred_vel = pred_joint_xyz[:, :, :, 1:] - pred_joint_xyz[:, :, :, :-1]
+                pred_vel[~fc_mask] = 0
+                terms["fc"] = self.masked_l2(pred_vel,
+                                             torch.zeros(pred_vel.shape, device=pred_vel.device),
+                                             mask[:, :, :, 1:])
+
             if self.lambda_vel > 0.:
                 target_vel = (target[..., 1:] - target[..., :-1])
                 model_output_vel = (model_output[..., 1:] - model_output[..., :-1])
@@ -1429,37 +1434,6 @@ class GaussianDiffusion:
         l_ankle_idx, r_ankle_idx = 7, 8
         l_foot_idx, r_foot_idx = 10, 11
         """ Contact calculated by 'Kfir Method' Commented code)"""
-        # contact_signal = torch.zeros((pose_xyz.shape[0], pose_xyz.shape[3], 2), device=pose_xyz.device) # [BatchSize, Frames, 2]
-        # left_xyz = 0.5 * (pose_xyz[:, l_ankle_idx, :, :] + pose_xyz[:, l_foot_idx, :, :]) # [BatchSize, 3, Frames]
-        # right_xyz = 0.5 * (pose_xyz[:, r_ankle_idx, :, :] + pose_xyz[:, r_foot_idx, :, :])
-        # left_z, right_z = left_xyz[:, 2, :], right_xyz[:, 2, :] # [BatchSize, Frames]
-        # left_velocity = torch.linalg.norm(left_xyz[:, :, 2:] - left_xyz[:, :, :-2], axis=1)  # [BatchSize, Frames]
-        # right_velocity = torch.linalg.norm(left_xyz[:, :, 2:] - left_xyz[:, :, :-2], axis=1)
-        #
-        # left_z_mask = left_z <= torch.mean(torch.sort(left_z)[0][:, :left_z.shape[1] // 5], axis=-1)
-        # left_z_mask = torch.stack([left_z_mask, left_z_mask], dim=-1) # [BatchSize, Frames, 2]
-        # left_z_mask[:, :, 1] = False  # Blank right side
-        # contact_signal[left_z_mask] = 0.4
-        #
-        # right_z_mask = right_z <= torch.mean(torch.sort(right_z)[0][:, :right_z.shape[1] // 5], axis=-1)
-        # right_z_mask = torch.stack([right_z_mask, right_z_mask], dim=-1) # [BatchSize, Frames, 2]
-        # right_z_mask[:, :, 0] = False  # Blank left side
-        # contact_signal[right_z_mask] = 0.4
-        # contact_signal[left_z <= (torch.mean(torch.sort(left_z)[:left_z.shape[0] // 5]) + 20), 0] = 1
-        # contact_signal[right_z <= (torch.mean(torch.sort(right_z)[:right_z.shape[0] // 5]) + 20), 1] = 1
-
-        # plt.plot(to_np_cpu(left_z[0]), label='left_z')
-        # plt.plot(to_np_cpu(left_velocity[0]), label='left_velocity')
-        # plt.plot(to_np_cpu(contact_signal[0, :, 0]), label='left_fc')
-        # plt.grid()
-        # plt.legend()
-        # plt.show()
-        # plt.plot(to_np_cpu(right_z[0]), label='right_z')
-        # plt.plot(to_np_cpu(right_velocity[0]), label='right_velocity')
-        # plt.plot(to_np_cpu(contact_signal[0, :, 1]), label='right_fc')
-        # plt.grid()
-        # plt.legend()
-        # plt.show()
 
         gt_joint_xyz = gt_xyz[:, [l_ankle_idx, l_foot_idx, r_ankle_idx, r_foot_idx], :, :]  # [BatchSize, 4, 3, Frames]
         gt_joint_vel = torch.linalg.norm(gt_joint_xyz[:, :, :, 1:] - gt_joint_xyz[:, :, :, :-1], axis=2)  # [BatchSize, 4, Frames]
@@ -1469,15 +1443,6 @@ class GaussianDiffusion:
         pred_joint_vel[~fc_mask] = 0  # Blank non-contact velocities frames. [BS,4,FRAMES]
         pred_joint_vel = torch.unsqueeze(pred_joint_vel, dim=2)
 
-        """DEBUG CODE"""
-        # print(f'mask: {mask.shape}')
-        # print(f'pred_joint_vel: {pred_joint_vel.shape}')
-        # plt.title(f'Joint: {joint_idx}')
-        # plt.plot(to_np_cpu(gt_joint_vel[0]), label='velocity')
-        # plt.plot(to_np_cpu(fc_mask[0]), label='fc')
-        # plt.grid()
-        # plt.legend()
-        # plt.show()
         return self.masked_l2(pred_joint_vel, torch.zeros(pred_joint_vel.shape, device=pred_joint_vel.device),
                               mask[:, :, :, 1:])
     # TODO - NOT USED YET, JUST COMMITING TO NOT DELETE THIS AND KEEP INITIAL IMPLEMENTATION, NOT DONE!

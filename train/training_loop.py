@@ -110,6 +110,7 @@ class TrainLoop:
                 motion = motion.to(self.device)
                 full = full.to(self.device)
                 sparse = sparse.to(self.device)
+
                 self.run_step(motion, full, sparse)
                 # cond = cond.to(self.device)
                 # self.run_step(motion, cond)

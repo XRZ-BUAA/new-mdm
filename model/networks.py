@@ -75,7 +75,7 @@ class BaseMLP(nn.Module):
 
 
 class DiffMLP(nn.Module):
-    def __init__(self, latent_dim=512, seq=98, num_layers=12):
+    def __init__(self, latent_dim=1024, seq=98, num_layers=12):
         super(DiffMLP, self).__init__()
 
         self.motion_mlp = BaseMLP(dim=latent_dim, seq=seq, num_layers=num_layers)
@@ -89,7 +89,7 @@ class DiffMLP(nn.Module):
 
 class PureMLP(nn.Module):
     def __init__(
-        self, latent_dim=512, seq=98, num_layers=12, input_dim=54, output_dim=132
+        self, latent_dim=1024, seq=98, num_layers=12, input_dim=54, output_dim=312
     ):
         super(PureMLP, self).__init__()
 

@@ -10,12 +10,12 @@ class MetaModel(nn.Module):
         self,
         arch,
         nfeats,
-        latent_dim=256,
+        latent_dim=1024,    # 由于现在全身动作表示的维数太高，改了一下潜在空间维度，但不知道这个数值是否合适
         num_layers=8,
         dropout=0.1,
         dataset="amass",
-        motion_dim=432, # 全身24个关节点
-        sparse_dim=90,  # 5个关节点的稀疏信号
+        motion_dim=936, # 全身22个关节点 + 双手30个关节点
+        sparse_dim=54,  # 3个关节点的稀疏信号
         **kargs,
     ):
         super().__init__()
