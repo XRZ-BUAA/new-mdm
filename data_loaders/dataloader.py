@@ -70,9 +70,9 @@ class TrainDataset(Dataset):
             idx = torch.randint(0, int(seqlen - self.input_motion_length), (1,))[0]
         motion = motion[idx: idx + self.input_motion_length]
         # 前7帧的全身特征
-        full = full[idx: idx + self.input_motion_length / 2]
+        full = full[idx: idx + self.input_motion_length // 2]
         # 当前帧的稀疏信号
-        sparse = sparse[idx + self.input_motion_length / 2]
+        sparse = sparse[idx + self.input_motion_length // 2]
 
         # 数据增强：给数据增加噪声
         noisy_full = gaussian_noisy_data(full, self.noise_factor)
