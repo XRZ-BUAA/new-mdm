@@ -48,7 +48,7 @@ def main(args):
     mean = rot_sum / num
     print("Mean:")
     print(mean)
-    torch.save(mean, os.path.join(args.savedir, "amass_mean.pt"))
+    torch.save(mean, os.path.join(args.save_dir, "amass_mean.pt"))
 
     mse = []
     print("Calculating std")
@@ -75,7 +75,7 @@ def main(args):
     std = math.sqrt(mse) / num
     print("STD:")
     print(std)
-    torch.save(std, os.path.join(args.savedir, "amass_std.pt"))
+    torch.save(std, os.path.join(args.save_dir, "amass_std.pt"))
 
 
 if __name__ == "__main__":
