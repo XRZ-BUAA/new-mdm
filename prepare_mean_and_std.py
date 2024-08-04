@@ -32,7 +32,13 @@ def main(args):
                 bdata = np.load(
                     file_path, allow_pickle=True
                 )
-                bdata_poses = bdata["poses"]
+
+                try:
+                    bdata_poses = bdata["poses"]
+                except KeyError:
+                    print('Warning: Can not find poses')
+                    continue
+
                 output_aa = torch.Tensor(bdata_poses[:, :156]).reshape(-1, 3)
                 output_6d = utils_transform.aa2sixd(output_aa).reshape(
                     bdata_poses.shape[0], -1
