@@ -15,8 +15,8 @@ AGRoL 的均值和标准差pt文件用不了
 '''
 
 def main(args):
-    if not os.path.exists(args.savedir):
-        os.makedirs(args.savedir)
+    if not os.path.exists(args.save_dir):
+        os.makedirs(args.save_dir)
 
     mean = []
     std = []
