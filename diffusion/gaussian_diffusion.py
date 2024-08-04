@@ -1293,7 +1293,7 @@ class GaussianDiffusion:
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
     # 这个函数 AGRoL 中的实现略有不同，但我暂时觉得按这个来
-    def training_losses(self, model, x_start, t, full, sparse, model_kwargs=None, noise=None, dataset=None):
+    def training_losses(self, model, x_start, t, full, sparse, head, model_kwargs=None, noise=None, dataset=None):
         """
         Compute training losses for a single timestep.
 

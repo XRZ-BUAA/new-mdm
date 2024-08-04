@@ -24,6 +24,7 @@ class TrainDataset(Dataset):
         motions,
         fulls,  # 包含冗余信息的全身动作特征（24个关节点）
         sparses,    # mean ... sparses 是 load_data() 的返回值
+        heads,
         input_motion_length=14, # 参数输入，暂定默认输入长度为14
         train_dataset_repeat_times=1,   # 参数输入
         no_normalization=False, # 参数输入
@@ -36,6 +37,7 @@ class TrainDataset(Dataset):
 
         self.fulls = fulls
         self.sparses = sparses
+        self.heads = heads
 
         self.train_dataset_repeat_times = train_dataset_repeat_times
         self.no_normalization = no_normalization
@@ -62,6 +64,8 @@ class TrainDataset(Dataset):
 
         full = self.fulls[idx % len(self.motions)]
 
+        head = self.heads[idx % len(self.motions)]
+
         seqlen = motion.shape[0]
 
         if seqlen <= self.input_motion_length:
@@ -74,6 +78,8 @@ class TrainDataset(Dataset):
         # 当前帧的稀疏信号
         sparse = sparse[idx + self.input_motion_length // 2]
 
+        head = head[idx: idx + self.input_motion_length]
+
         # 数据增强：给数据增加噪声
         noisy_full = gaussian_noisy_data(full, self.noise_factor)
         noisy_sparse = gaussian_noisy_data(sparse, self.noise_factor)
@@ -82,7 +88,7 @@ class TrainDataset(Dataset):
         if not self.no_normalization:
             motion = (motion - self.mean) / (self.std + 1e-8)
 
-        return motion.float(), noisy_full.float(), noisy_sparse.float()
+        return motion.float(), noisy_full.float(), noisy_sparse.float(), head.float()
 
 
 # 不需要输出前序帧的全身动作
@@ -159,7 +165,9 @@ def get_motion(motion_list):
 
     sparses = [i["hmd_position_global_full_gt_list"] for i in motion_list]
 
-    return motions, fulls, sparses
+    heads = [i["head_global_trans_list"] for i in motion_list]
+
+    return motions, fulls, sparses, heads
 
 
 def get_path(dataset_path, split):
@@ -224,13 +232,15 @@ def load_data(dataset, dataset_path, split, **kwargs):
     input_motion_length = kwargs["input_motion_length"]
     motion_list = [torch.load(i) for i in tqdm(motion_list)]
 
-    motions, fulls, sparses = get_motion(motion_list)
+    motions, fulls, sparses, heads = get_motion(motion_list)
 
     new_motions = []
 
     new_fulls = []
 
     new_sparses = []
+
+    new_heads = []
 
     for idx, motion in enumerate(motions):
         if motion.shape[0] < input_motion_length:  # Arbitrary choice
@@ -240,6 +250,8 @@ def load_data(dataset, dataset_path, split, **kwargs):
         new_fulls.append(fulls[idx])
 
         new_motions.append(motions[idx])
+
+        new_heads.append(heads[idx])
 
     if os.path.exists(os.path.join(dataset_path, mean_path)):
         mean = torch.load(os.path.join(dataset_path, mean_path))
@@ -253,7 +265,7 @@ def load_data(dataset, dataset_path, split, **kwargs):
         with open(os.path.join(dataset_path, std_path), "wb") as f:
             torch.save(std, f)
 
-    return new_motions, new_fulls, new_sparses, mean, std
+    return new_motions, new_fulls, new_sparses, new_heads, mean, std
 
 
 def get_dataloader(
