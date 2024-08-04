@@ -83,12 +83,6 @@ if __name__ == "__main__":
         formatter_class=argparse.ArgumentDefaultsHelpFormatter
     )
     parser.add_argument(
-        "--support_dir",
-        type=str,
-        default=None,
-        help="=dir where you put your smplh and dmpls dirs",
-    )
-    parser.add_argument(
         "--save_dir",
         type=str,
         default=None,
