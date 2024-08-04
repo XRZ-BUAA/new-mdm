@@ -52,8 +52,8 @@ def main(args):
                     num += rotation_local_full_gt_list.shape[0]
 
     mean = rot_sum / num
-    print("Mean:")
-    print(mean)
+    print("Mean Shape:")
+    print(mean.shape)
     torch.save(mean, os.path.join(args.save_dir, "amass_mean.pt"))
 
     mse = None
@@ -73,10 +73,11 @@ def main(args):
                     bdata_poses.shape[0], -1
                 )
                 rotation_local_full_gt_list = output_6d[1:]
-                if mse == None:
-                    mse = (rotation_local_full_gt_list - mean) ** 2
-                else:
-                    mse += (rotation_local_full_gt_list - mean) ** 2
+                for row in rotation_local_full_gt_list:
+                    if mse == None:
+                        mse = (row - mean) ** 2
+                    else:
+                        mse += (row - mean) ** 2
 
     std = math.sqrt(mse) / num
     print("STD:")
