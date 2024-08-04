@@ -18,9 +18,9 @@ def main(args):
     if not os.path.exists(args.save_dir):
         os.makedirs(args.save_dir)
 
-    mean = []
-    std = []
-    rot_sum = []
+    mean = None
+    std = None
+    rot_sum = None
     num = 0
     print("Calculating mean")
     for dataroot_subset in ["BioMotionLab_NTroje", "CMU", "MPI_HDM05"]:
@@ -38,7 +38,7 @@ def main(args):
                     bdata_poses.shape[0], -1
                 )
                 rotation_local_full_gt_list = output_6d[1:]
-                if not rot_sum:
+                if rot_sum == None:
                     rot_sum = torch.sum(rotation_local_full_gt_list, dim=0)
                     num = rotation_local_full_gt_list.shape[0]
                 else:
@@ -50,7 +50,7 @@ def main(args):
     print(mean)
     torch.save(mean, os.path.join(args.save_dir, "amass_mean.pt"))
 
-    mse = []
+    mse = None
     print("Calculating std")
     for dataroot_subset in ["BioMotionLab_NTroje", "CMU", "MPI_HDM05"]:
         print(dataroot_subset)
@@ -67,7 +67,7 @@ def main(args):
                     bdata_poses.shape[0], -1
                 )
                 rotation_local_full_gt_list = output_6d[1:]
-                if not mse:
+                if mse == None:
                     mse = (rotation_local_full_gt_list - mean) ** 2
                 else:
                     mse += (rotation_local_full_gt_list - mean) ** 2
