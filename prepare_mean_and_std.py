@@ -83,7 +83,7 @@ def main(args):
                     else:
                         mse += (row - mean) ** 2
 
-    std = math.sqrt(mse) / num
+    std = torch.sqrt(mse) / num
     print("STD:")
     print(std)
     torch.save(std, os.path.join(args.save_dir, "amass_std.pt"))
