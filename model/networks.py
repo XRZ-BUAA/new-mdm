@@ -71,7 +71,7 @@ class BaseMLP(nn.Module):
         layers = []
         for i in range(num_layers):
             layers.append(
-                MLPblock(dim, seq, seq, first=i == 0 and w_embed, w_embed=w_embed)
+                MLPblock(dim, seq, seq, first=i == 0 and w_embed, w_embed=w_embed).cuda()
             )
 
         self.mlps = nn.Sequential(*layers)
