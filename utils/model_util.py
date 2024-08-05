@@ -34,7 +34,6 @@ def get_model_args(args):
         "arch": args.arch,
         "nfeats": args.motion_nfeat,
         "latent_dim": args.latent_dim,
-        "motion_dim": args.motion_dim, # 包含冗余信息的全身动作特征（24个关节点）维度
         "sparse_dim": args.sparse_dim,
         "num_layers": args.layers,
         "dropout": 0.1,

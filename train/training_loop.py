@@ -109,13 +109,11 @@ class TrainLoop:
 
         for epoch in range(self.num_epochs):
             print(f"Starting epoch {epoch}")
-            for motion, full, sparse, head in tqdm(self.data):
+            for motion, sparse in tqdm(self.data):
                 motion = motion.to(self.device)
-                full = full.to(self.device)
                 sparse = sparse.to(self.device)
-                head = head.to(self.device)
 
-                self.run_step(motion, full, sparse, head)
+                self.run_step(motion, sparse)
                 # cond = cond.to(self.device)
                 # self.run_step(motion, cond)
                 self.step += 1
@@ -131,13 +129,13 @@ class TrainLoop:
         if (self.step - 1) % self.save_interval != 0:
             self.save()
 
-    def run_step(self, batch, full, sparse, head):
-        self.forward_backward(batch, full, sparse, head)
+    def run_step(self, batch, sparse):
+        self.forward_backward(batch, sparse)
         self.mp_trainer.optimize(self.opt)
         self._step_lr()
         self.log_step()
 
-    def forward_backward(self, batch, full, sparse, head):
+    def forward_backward(self, batch, sparse):
         self.mp_trainer.zero_grad()
 
         t, weights = self.schedule_sampler.sample(batch.shape[0], dist_util.dev())
@@ -147,9 +145,7 @@ class TrainLoop:
             self.ddp_model,
             batch,
             t,
-            full,
             sparse,
-            head,
             self.body_model,
             dataset=self.data.dataset,
         )

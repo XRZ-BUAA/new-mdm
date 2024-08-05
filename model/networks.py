@@ -12,57 +12,32 @@ class MLPblock(nn.Module):
         super().__init__()
 
         self.w_embed = w_embed
-        # self.fc0 = nn.Conv1d(seq0, seq1, 1).cuda()
+        self.fc0 = nn.Conv1d(seq0, seq1, 1)
 
         if self.w_embed:
             if first:
-                self.conct = nn.Linear(dim * 3, dim).cuda()
+                self.conct = nn.Linear(dim * 2, dim)
             else:
-                self.conct = nn.Identity().cuda()
-            self.emb_fc = nn.Linear(dim, dim).cuda()
+                self.conct = nn.Identity()
+            self.emb_fc = nn.Linear(dim, dim)
 
-        self.fc1 = nn.Linear(dim, dim).cuda()
-        self.norm0 = nn.LayerNorm(dim).cuda()
-        self.norm1 = nn.LayerNorm(dim).cuda()
-        self.act = nn.SiLU().cuda()
-
+        self.fc1 = nn.Linear(dim, dim)
+        self.norm0 = nn.LayerNorm(dim)
+        self.norm1 = nn.LayerNorm(dim)
+        self.act = nn.SiLU()
 
     def forward(self, inputs):
-        print("MLPblock Inputs Shape")
-        print(inputs[0].shape)
-        inputs = [input_tensor.to('cuda:0') for input_tensor in inputs]
-        print("One more time")
-        print(inputs[0].shape)
 
         if self.w_embed:
-            print("w_embed == True")
             x = inputs[0]
-
             embed = inputs[1]
             x = self.conct(x) + self.emb_fc(self.act(embed))
-            print(x.shape)
         else:
             x = inputs
 
-        print("MLPblock X Shape")
-        print(x.shape)
         x_ = self.norm0(x)
-
-        # 我要开始魔改了
-        '''
-        n = x_.shape[-1]
-        in_process = nn.Linear(n, 14*312).cuda()
-        x_ = in_process(x_)
-        x_ = x_.reshape(-1, 14, 312)
         x_ = self.fc0(x_)
-        x_ = x_.reshape(-1, 14 * 312)
-        out_process = nn.Linear(14 * 312, n).cuda()
-        x_ = out_process(x_)
-        '''
         x_ = self.act(x_)
-
-        print(x.shape)
-        print(x_.shape)
         x = x + x_
 
         x_ = self.norm1(x)
@@ -84,7 +59,7 @@ class BaseMLP(nn.Module):
         layers = []
         for i in range(num_layers):
             layers.append(
-                MLPblock(dim, seq, seq, first=i == 0 and w_embed, w_embed=w_embed).cuda()
+                MLPblock(dim, seq, seq, first=i == 0 and w_embed, w_embed=w_embed)
             )
 
         self.mlps = nn.Sequential(*layers)
@@ -100,7 +75,7 @@ class BaseMLP(nn.Module):
 
 
 class DiffMLP(nn.Module):
-    def __init__(self, latent_dim=1024, seq=7, num_layers=12):
+    def __init__(self, latent_dim=512, seq=98, num_layers=12):
         super(DiffMLP, self).__init__()
 
         self.motion_mlp = BaseMLP(dim=latent_dim, seq=seq, num_layers=num_layers)
@@ -114,7 +89,7 @@ class DiffMLP(nn.Module):
 
 class PureMLP(nn.Module):
     def __init__(
-        self, latent_dim=1024, seq=98, num_layers=12, input_dim=54, output_dim=312
+        self, latent_dim=512, seq=98, num_layers=12, input_dim=54, output_dim=132
     ):
         super(PureMLP, self).__init__()
 

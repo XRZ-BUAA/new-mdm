@@ -65,7 +65,7 @@ def main():
 
     print("creating data loader...")
 
-    motions, fulls, sparses, heads, mean, std = load_data(
+    motions, sparses, mean, std = load_data(
         args.dataset,
         args.dataset_path,
         "train",
@@ -79,9 +79,7 @@ def main():
         mean,
         std,
         motions,
-        fulls,
         sparses,
-        heads,
         args.input_motion_length,
         args.train_dataset_repeat_times,
         args.no_normalization,
