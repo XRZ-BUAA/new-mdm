@@ -76,11 +76,15 @@ class MetaModel(nn.Module):
         sparse_emb = sparse_emb.reshape(bs, -1)
 
         # DEBUG
-        print(motion_emb.shape)
-
+        motion_emb_mask = self.mask_cond(motion_emb, force_mask=force_mask)
+        print(motion_emb_mask.shape)
+        print(motion_emb_mask)
+        motion_emb = self.motion_process(motion_emb_mask)
+        '''
         motion_emb = self.motion_process(
             self.mask_cond(motion_emb, force_mask=force_mask)
         )
+        '''
         # Pass the sparse signal to a FC
         sparse_emb = self.sparse_process(
             self.mask_cond(sparse_emb, force_mask=force_mask)
