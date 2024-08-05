@@ -253,6 +253,12 @@ def add_training_options(parser):
         type=int,
         help="Number of dataloader workers.",
     )
+    # 为了损失函数的计算（受不了了）
+    group.add_argument(
+        "--support_dir",
+        type=str,
+        help="the dir that you store your smplh and dmpls dirs",
+    )
 
 # 换成了 AGRoL 版本
 def add_sampling_options(parser):

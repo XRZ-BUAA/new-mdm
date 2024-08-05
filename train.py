@@ -5,6 +5,7 @@ import torch
 
 from data_loaders.dataloader import get_dataloader, load_data, TrainDataset
 from train.training_loop import TrainLoop
+from human_body_prior.body_model.body_model import BodyModel as BM
 
 from utils import dist_util
 
@@ -12,6 +13,41 @@ from utils.model_util import create_model_and_diffusion
 from utils.parser_util import train_args
 
 from utils.fixseed import fixseed
+
+
+class BodyModel(torch.nn.Module):
+    def __init__(self, support_dir):
+        super().__init__()
+
+        device = torch.device("cuda")
+        subject_gender = "male"
+        bm_fname = os.path.join(
+            support_dir, "smplh/{}/model.npz".format(subject_gender)
+        )
+        dmpl_fname = os.path.join(
+            support_dir, "dmpls/{}/model.npz".format(subject_gender)
+        )
+        num_betas = 16  # number of body parameters
+        num_dmpls = 8  # number of DMPL parameters
+        body_model = BM(
+            bm_fname=bm_fname,
+            num_betas=num_betas,
+            num_dmpls=num_dmpls,
+            dmpl_fname=dmpl_fname,
+        ).to(device)
+        self.body_model = body_model.eval()
+
+    def forward(self, body_params):
+        with torch.no_grad():
+            body_pose = self.body_model(
+                **{
+                    k: v
+                    for k, v in body_params.items()
+                    if k in ["pose_body", "pose_hand", "trans", "root_orient"]
+                }
+            )
+        return body_pose
+
 
 def main():
     args = train_args()
@@ -35,6 +71,8 @@ def main():
         "train",
         input_motion_length=args.input_motion_length,
     )
+
+    body_model = BodyModel(args.support_dir)
 
     dataset = TrainDataset(
         args.dataset,
@@ -78,7 +116,7 @@ def main():
         )
 
     print("Training...")
-    TrainLoop(args, model, diffusion, dataloader).run_loop()
+    TrainLoop(args, model, diffusion, dataloader, body_model).run_loop()
     print("Done.")
 
 

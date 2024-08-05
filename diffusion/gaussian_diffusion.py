@@ -17,7 +17,7 @@ from diffusion.nn import mean_flat, sum_flat
 from diffusion.losses import normal_kl, discretized_gaussian_log_likelihood
 from data_loaders.humanml.scripts import motion_process
 
-from model.rotation2xyz import Rotation2xyz
+from utils import utils_transform
 
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps, scale_betas=1.):
     """
@@ -202,19 +202,26 @@ class GaussianDiffusion:
 
         self.l2_loss = lambda a, b: (a - b) ** 2  # th.nn.MSELoss(reduction='none')  # must be None for handling mask later on.
 
-    def masked_l2(self, a, b, mask):
-        # assuming a.shape == b.shape == bs, J, Jdim, seqlen
-        # assuming mask.shape == bs, 1, 1, seqlen
-        loss = self.l2_loss(a, b)
-        loss = sum_flat(loss * mask.float())  # gives \sigma_euclidean over unmasked elements
-        n_entries = a.shape[1] * a.shape[2]
-        non_zero_elements = sum_flat(mask) * n_entries
-        # print('mask', mask.shape)
-        # print('non_zero_elements', non_zero_elements)
-        # print('loss', loss)
-        mse_loss_val = loss / non_zero_elements
-        # print('mse_loss_val', mse_loss_val)
-        return mse_loss_val
+    def rot_loss(self, a, b):
+        loss = torch.mean(
+            torch.norm(
+                (a - b).reshape(-1, 6),
+                2,
+                1,
+            )
+        )
+
+        return loss
+
+    def fk_loss(self, a, b):
+        loss = torch.mean(
+            torch.norm(
+                (a - b).reshape(-1, 3),
+                p=2,
+                dim=1
+            )
+        )
+        return loss
 
 
     def q_mean_variance(self, x_start, t):
@@ -1274,7 +1281,7 @@ class GaussianDiffusion:
         )
         # 改
         out = self.p_mean_variance(
-            model, x_t, t, full=full, sparse=sparse,clip_denoised=clip_denoised, model_kwargs=model_kwargs
+            model, x_t, t, full=full, sparse=sparse, clip_denoised=clip_denoised, model_kwargs=model_kwargs
         )
         kl = normal_kl(
             true_mean, true_log_variance_clipped, out["mean"], out["log_variance"]
@@ -1292,8 +1299,23 @@ class GaussianDiffusion:
         output = th.where((t == 0), decoder_nll, kl)
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
-    # 这个函数 AGRoL 中的实现略有不同，但我暂时觉得按这个来
-    def training_losses(self, model, x_start, t, full, sparse, head, model_kwargs=None, noise=None, dataset=None):
+    # 通过关节点6d局部旋转计算关节点相对根关节的位置，用于计算损失函数
+    def get_local_pos(self, rot, body_model):
+        bs, seq = rot.shape[:2]
+        rot = rot.reshape(-1, 52, 6)
+        rot_input = utils_transform.sixd2aa(rot, batch=True).flatten(1, 2)
+
+        body_pose_local = body_model(
+            {
+                "pose_body": rot_input[..., 3:66],
+                "pose_hand": rot_input[..., 66:156],
+                "root_orient": rot_input[..., :3],
+            }
+        ).Jtr
+        output = body_pose_local[:, :52, :].reshape(bs, seq, -1)
+        return output
+
+    def training_losses(self, model, x_start, t, full, sparse, head, body_model, model_kwargs=None, noise=None, dataset=None):
         """
         Compute training losses for a single timestep.
 
@@ -1311,14 +1333,7 @@ class GaussianDiffusion:
         """
 
         # enc = model.model._modules['module']
-        rot_to_xyz = Rotation2xyz(x_start.device)
-        mask = model_kwargs['y']['mask']
-
-        get_xyz = lambda sample: rot_to_xyz(sample, mask=None, pose_rep='rot6d', translation=True,
-                                             glob=True,
-                                             # jointstype='vertices',  # 3.4 iter/sec # USED ALSO IN MotionCLIP
-                                             jointstype='smpl',  # 3.4 iter/sec
-                                             vertstrans=False)
+        # mask = model_kwargs['y']['mask']
 
         if model_kwargs is None:
             model_kwargs = {}
@@ -1371,49 +1386,53 @@ class GaussianDiffusion:
                 ModelMeanType.START_X: x_start,
                 ModelMeanType.EPSILON: noise,
             }[self.model_mean_type]
-            assert model_output.shape == target.shape == x_start.shape  # [bs, njoints, nfeats, nframes]
+            assert model_output.shape == target.shape == x_start.shape
 
-            terms["rot_mse"] = self.masked_l2(target, model_output, mask) # mean_flat(rot_mse)
+            terms["rot_mse"] = self.rot_loss(target, model_output)
 
             # 从这里开始AGRoL就没抄了
-            target_xyz, model_output_xyz = None, None
+            target_pos, model_output_pos = None, None
 
             if self.lambda_rcxyz > 0.:
-                target_xyz = get_xyz(target)  # [bs, nvertices(vertices)/njoints(smpl), 3, nframes]
-                model_output_xyz = get_xyz(model_output)  # [bs, nvertices, 3, nframes]
-                terms["rcxyz_mse"] = self.masked_l2(target_xyz, model_output_xyz, mask)  # mean_flat((target_xyz - model_output_xyz) ** 2)
+                target_pos = self.get_local_pos(target, body_model)
+                model_output_pos = self.get_local_pos(model_output, body_model)
+                terms["rcxyz_mse"] = self.fk_loss(target_pos, model_output_pos)
 
             if self.lambda_vel_rcxyz > 0.:
-                target_xyz = get_xyz(target) if target_xyz is None else target_xyz
-                model_output_xyz = get_xyz(model_output) if model_output_xyz is None else model_output_xyz
-                target_xyz_vel = (target_xyz[:, :, :, 1:] - target_xyz[:, :, :, :-1])
-                model_output_xyz_vel = (model_output_xyz[:, :, :, 1:] - model_output_xyz[:, :, :, :-1])
-                terms["vel_xyz_mse"] = self.masked_l2(target_xyz_vel, model_output_xyz_vel, mask[:, :, :, 1:])
+                target_pos = self.get_local_pos(target, body_model) if target_pos is None else target_pos
+                model_output_pos = self.get_local_pos(model_output, body_model) if model_output_pos is None \
+                    else model_output_pos
+
+                target_pos_vel = (target_pos[:, 1:, :] - target_pos[:, :-1, :])
+                model_output_pos_vel = (model_output_pos[:, 1:, :] - model_output_pos[:, :-1, :])
+                terms["vel_xyz_mse"] = self.fk_loss(target_pos_vel, model_output_pos_vel)
 
             if self.lambda_fc > 0.:
                 torch.autograd.set_detect_anomaly(True)
-                target_xyz = get_xyz(target) if target_xyz is None else target_xyz
-                model_output_xyz = get_xyz(model_output) if model_output_xyz is None else model_output_xyz
+                target_pos = self.get_local_pos(target, body_model) if target_pos is None else target_pos
+                model_output_pos = self.get_local_pos(model_output, body_model) if model_output_pos is None \
+                    else model_output_pos
+                bs, seq = target_pos.shape[:2]
+                target_pos = target_pos.reshape(bs, seq, -1, 3)
+                model_output_pos = model_output_pos.reshape(bs, seq, -1, 3)
                 # 'L_Ankle',  # 7, 'R_Ankle',  # 8 , 'L_Foot',  # 10, 'R_Foot',  # 11
                 l_ankle_idx, r_ankle_idx, l_foot_idx, r_foot_idx = 7, 8, 10, 11
                 relevant_joints = [l_ankle_idx, l_foot_idx, r_ankle_idx, r_foot_idx]
-                gt_joint_xyz = target_xyz[:, relevant_joints, :, :]  # [BatchSize, 4, 3, Frames]
-                gt_joint_vel = torch.linalg.norm(gt_joint_xyz[:, :, :, 1:] - gt_joint_xyz[:, :, :, :-1],
-                                                 axis=2)  # [BatchSize, 4, Frames]
-                fc_mask = torch.unsqueeze((gt_joint_vel <= 0.01), dim=2).repeat(1, 1, 3, 1)
-                pred_joint_xyz = model_output_xyz[:, relevant_joints, :, :]  # [BatchSize, 4, 3, Frames]
-                pred_vel = pred_joint_xyz[:, :, :, 1:] - pred_joint_xyz[:, :, :, :-1]
+
+                gt_joint_pos = target_pos[:, :, relevant_joints, :]
+                gt_joint_vel = torch.linalg.norm(gt_joint_pos[:, 1:, :, :] - gt_joint_pos[:, :-1, :, :],
+                                                 axis=3)
+                fc_mask = torch.unsqueeze((gt_joint_vel <= 0.01), dim=3).repeat(1, 1, 1, 3)
+
+                pred_joint_pos = model_output_pos[:, :, relevant_joints, :]
+                pred_vel = pred_joint_pos[:, 1:, :, :] - pred_joint_pos[:, :-1, :, :]
                 pred_vel[~fc_mask] = 0
-                terms["fc"] = self.masked_l2(pred_vel,
-                                             torch.zeros(pred_vel.shape, device=pred_vel.device),
-                                             mask[:, :, :, 1:])
+                terms["fc"] = self.fk_loss(pred_vel, torch.zeros(pred_vel.shape, device=pred_vel.device),)
 
             if self.lambda_vel > 0.:
-                target_vel = (target[..., 1:] - target[..., :-1])
-                model_output_vel = (model_output[..., 1:] - model_output[..., :-1])
-                terms["vel_mse"] = self.masked_l2(target_vel[:, :-1, :, :], # Remove last joint, is the root location!
-                                                  model_output_vel[:, :-1, :, :],
-                                                  mask[:, :, :, 1:])  # mean_flat((target_vel - model_output_vel) ** 2)
+                target_vel = (target[:, 1:, ...] - target[:, :-1, ...])
+                model_output_vel = (model_output[:, 1:, ...] - model_output[:, :-1, ...])
+                terms["vel_mse"] = self.rot_loss(target_vel[:, :, 3:, :], model_output_vel[:, :, 3:, :])  # mean_flat((target_vel - model_output_vel) ** 2)
 
             terms["loss"] = terms["rot_mse"] + terms.get('vb', 0.) +\
                             (self.lambda_vel * terms.get('vel_mse', 0.)) +\

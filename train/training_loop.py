@@ -23,12 +23,15 @@ from utils import dist_util
 
 
 class TrainLoop:
-    def __init__(self, args, model, diffusion, data):
+    def __init__(self, args, model, diffusion, data, body_model):
         self.args = args
         self.dataset = args.dataset
         self.model = model
         self.diffusion = diffusion
         self.data = data
+
+        self.body_model = body_model
+
         self.batch_size = args.batch_size
         self.lr = args.lr
         self.log_interval = args.log_interval
@@ -147,6 +150,7 @@ class TrainLoop:
             full,
             sparse,
             head,
+            self.body_model,
             dataset=self.data.dataset,
         )
 
