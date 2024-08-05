@@ -44,14 +44,14 @@ class MetaModel(nn.Module):
         self.output_process = nn.Linear(self.latent_dim, self.input_feats * 14)
 
     def mask_cond(self, cond, force_mask=True):
-        bs, n, c = cond.shape
+        bs, n = cond.shape
         if force_mask:
             return torch.zeros_like(cond)
         elif self.training and self.cond_mask_prob > 0.0:
             mask = torch.bernoulli(
                 torch.ones(bs, device=cond.device) * self.cond_mask_prob
             ).view(
-                bs, 1, 1
+                bs, 1
             )  # 1-> use null_cond, 0-> use real cond
             return cond * (1.0 - mask)
         else:
