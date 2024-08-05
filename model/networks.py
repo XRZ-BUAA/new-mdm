@@ -35,10 +35,12 @@ class MLPblock(nn.Module):
         print(inputs[0].shape)
 
         if self.w_embed:
+            print("w_embed == True")
             x = inputs[0]
 
             embed = inputs[1]
             x = self.conct(x) + self.emb_fc(self.act(embed))
+            print(x.shape)
         else:
             x = inputs
 
