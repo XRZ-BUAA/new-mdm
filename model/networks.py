@@ -12,19 +12,19 @@ class MLPblock(nn.Module):
         super().__init__()
 
         self.w_embed = w_embed
-        self.fc0 = nn.Conv1d(seq0, seq1, 1)
+        self.fc0 = nn.Conv1d(seq0, seq1, 1).cuda()
 
         if self.w_embed:
             if first:
-                self.conct = nn.Linear(dim * 3, dim)
+                self.conct = nn.Linear(dim * 3, dim).cuda()
             else:
-                self.conct = nn.Identity()
-            self.emb_fc = nn.Linear(dim, dim)
+                self.conct = nn.Identity().cuda()
+            self.emb_fc = nn.Linear(dim, dim).cuda()
 
-        self.fc1 = nn.Linear(dim, dim)
-        self.norm0 = nn.LayerNorm(dim)
-        self.norm1 = nn.LayerNorm(dim)
-        self.act = nn.SiLU()
+        self.fc1 = nn.Linear(dim, dim).cuda()
+        self.norm0 = nn.LayerNorm(dim).cuda()
+        self.norm1 = nn.LayerNorm(dim).cuda()
+        self.act = nn.SiLU().cuda()
 
 
     def forward(self, inputs):
@@ -41,12 +41,12 @@ class MLPblock(nn.Module):
 
         # 我要开始魔改了
         n = x_.shape[-1]
-        in_process = nn.Linear(n, 14*312)
+        in_process = nn.Linear(n, 14*312).cuda()
         x_ = in_process(x_)
         x_ = x_.reshape(-1, 14, 312)
         x_ = self.fc0(x_)
         x_ = x_.reshape(-1, 14 * 312)
-        out_process = nn.Linear(14 * 312, n)
+        out_process = nn.Linear(14 * 312, n).cuda()
         x_ = out_process(x_)
 
         x_ = self.act(x_)
