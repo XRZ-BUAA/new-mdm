@@ -40,13 +40,13 @@ class MLPblock(nn.Module):
         # 我要开始魔改了
         n = x_.shape[-1]
         in_process = nn.Linear(n, 14*312)
-        x_ = in_process(x_)
+        x_ = in_process(x_.cuda()).cpu()
         x_ = x_.reshape(-1, 14, 312)
         x_ = self.fc0(x_)
         x_ = x_.reshape(-1, 14 * 312)
         out_process = nn.Linear(14 * 312, n)
-        x_ = out_process(x_)
-        
+        x_ = out_process(x_.cuda()).cpu()
+
         x_ = self.act(x_)
         x = x + x_
 
