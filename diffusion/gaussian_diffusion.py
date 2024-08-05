@@ -1386,6 +1386,14 @@ class GaussianDiffusion:
                 ModelMeanType.START_X: x_start,
                 ModelMeanType.EPSILON: noise,
             }[self.model_mean_type]
+
+            print("Model Output Shape")
+            print(model_output.shape)
+            print("Target Shape")
+            print(target.shape)
+            print("X_start Shape")
+            print(x_start.shape)
+
             assert model_output.shape == target.shape == x_start.shape
 
             terms["rot_mse"] = self.rot_loss(target, model_output)

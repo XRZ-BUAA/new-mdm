@@ -100,7 +100,7 @@ class MetaModel(nn.Module):
 
         # Pass the output to a FC and reshape the output
         output = self.output_process(output)
-        output = output.reshape(bs, nframes, -1)
+        output = output.reshape(bs, 14, -1)
         return output
 
 
