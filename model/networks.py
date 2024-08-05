@@ -34,6 +34,8 @@ class MLPblock(nn.Module):
 
         if self.w_embed:
             x = inputs[0]
+            print("One more time")
+            print(x.shape)
             embed = inputs[1]
             x = self.conct(x) + self.emb_fc(self.act(embed))
         else:
