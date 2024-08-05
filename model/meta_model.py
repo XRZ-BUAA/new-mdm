@@ -96,6 +96,10 @@ class MetaModel(nn.Module):
         # Concat the sparse feature with input
         # x = torch.cat((sparse_emb, x), axis=-1)
         x = torch.cat((motion_emb, sparse_emb, x), dim=-1)
+
+        print("MetaModel X Shape")
+        print(x.shape)
+        
         output = self.mlp(x, emb)
 
         # Pass the output to a FC and reshape the output
