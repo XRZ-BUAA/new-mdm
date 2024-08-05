@@ -53,6 +53,8 @@ class MetaModel(nn.Module):
             ).view(
                 bs, 1
             )  # 1-> use null_cond, 0-> use real cond
+            print("cond shape:", cond.shape)  # 打印 cond 的形状
+            print("mask shape:", mask.shape)
             return cond * (1.0 - mask)
         else:
             return cond
