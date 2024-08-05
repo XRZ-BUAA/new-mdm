@@ -21,9 +21,9 @@ class MLPblock(nn.Module):
                 self.conct = nn.Identity().cuda()
             self.emb_fc = nn.Linear(dim, dim).cuda()
 
-        self.fc1 = nn.Linear(dim, dim).cuda()
-        self.norm0 = nn.LayerNorm(dim).cuda()
-        self.norm1 = nn.LayerNorm(dim).cuda()
+        self.fc1 = nn.Linear(dim * 3, dim * 3).cuda()
+        self.norm0 = nn.LayerNorm(dim * 3).cuda()
+        self.norm1 = nn.LayerNorm(dim * 3).cuda()
         self.act = nn.SiLU().cuda()
 
 
@@ -50,6 +50,9 @@ class MLPblock(nn.Module):
         x_ = out_process(x_)
 
         x_ = self.act(x_)
+        
+        print(x.shape)
+        print(x_.shape)
         x = x + x_
 
         x_ = self.norm1(x)
@@ -87,7 +90,7 @@ class BaseMLP(nn.Module):
 
 
 class DiffMLP(nn.Module):
-    def __init__(self, latent_dim=2048, seq=7, num_layers=12):
+    def __init__(self, latent_dim=1024, seq=7, num_layers=12):
         super(DiffMLP, self).__init__()
 
         self.motion_mlp = BaseMLP(dim=latent_dim, seq=seq, num_layers=num_layers)
@@ -101,7 +104,7 @@ class DiffMLP(nn.Module):
 
 class PureMLP(nn.Module):
     def __init__(
-        self, latent_dim=2048, seq=98, num_layers=12, input_dim=54, output_dim=312
+        self, latent_dim=1024, seq=98, num_layers=12, input_dim=54, output_dim=312
     ):
         super(PureMLP, self).__init__()
 
