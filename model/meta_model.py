@@ -45,18 +45,27 @@ class MetaModel(nn.Module):
 
     def mask_cond(self, cond, force_mask=True):
         bs, n = cond.shape
+
+        # DEBUG
+        print(cond)
+
         if force_mask:
+            print('Hei')
             return torch.zeros_like(cond)
         elif self.training and self.cond_mask_prob > 0.0:
+
+            # DEBUG
+            print(self.cond_mask_prob)
+
             mask = torch.bernoulli(
                 torch.ones(bs, device=cond.device) * self.cond_mask_prob
             ).view(
                 bs, 1
             )  # 1-> use null_cond, 0-> use real cond
-            print("cond shape:", cond.shape)  # 打印 cond 的形状
-            print("mask shape:", mask.shape)
+
             return cond * (1.0 - mask)
         else:
+            print('I am here')
             return cond
 
     def forward(self, x, timesteps, motion_emb, sparse_emb, force_mask=False):
@@ -73,6 +82,9 @@ class MetaModel(nn.Module):
         x = x.reshape(bs, -1)
         motion_emb = motion_emb.reshape(bs, -1)
         sparse_emb = sparse_emb.reshape(bs, -1)
+
+        # DEBUG
+        print(motion_emb)
 
         motion_emb = self.motion_process(
             self.mask_cond(motion_emb, force_mask=force_mask)
