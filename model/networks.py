@@ -31,11 +31,12 @@ class MLPblock(nn.Module):
         print("MLPblock Inputs Shape")
         print(inputs[0].shape)
         inputs = [input_tensor.to('cuda:0') for input_tensor in inputs]
+        print("One more time")
+        print(inputs[0].shape)
 
         if self.w_embed:
             x = inputs[0]
-            print("One more time")
-            print(x.shape)
+
             embed = inputs[1]
             x = self.conct(x) + self.emb_fc(self.act(embed))
         else:
