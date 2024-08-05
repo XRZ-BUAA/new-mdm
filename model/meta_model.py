@@ -32,7 +32,7 @@ class MetaModel(nn.Module):
         self.motion_dim = motion_dim
 
         self.cond_mask_prob = kargs.get("cond_mask_prob", 0.0)
-        self.input_process = nn.Linear(self.input_feats, self.latent_dim)
+        self.input_process = nn.Linear(self.input_feats * 14, self.latent_dim)
 
         self.mlp = self.arch(
             self.latent_dim, seq=kargs.get("input_motion_length"), num_layers=num_layers
