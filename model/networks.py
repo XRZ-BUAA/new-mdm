@@ -16,7 +16,7 @@ class MLPblock(nn.Module):
 
         if self.w_embed:
             if first:
-                self.conct = nn.Linear(dim * 2, dim)
+                self.conct = nn.Linear(dim * 3, dim)
             else:
                 self.conct = nn.Identity()
             self.emb_fc = nn.Linear(dim, dim)
