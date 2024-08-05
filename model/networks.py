@@ -28,6 +28,8 @@ class MLPblock(nn.Module):
 
 
     def forward(self, inputs):
+        print("MLPblock Inputs Shape")
+        print(inputs.shape)
         inputs = [input_tensor.to('cuda:0') for input_tensor in inputs]
 
         if self.w_embed:
@@ -37,7 +39,7 @@ class MLPblock(nn.Module):
         else:
             x = inputs
 
-        print("MLPblock Inputs Shape")
+        print("MLPblock X Shape")
         print(x.shape)
         x_ = self.norm0(x)
 

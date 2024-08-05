@@ -77,8 +77,6 @@ class MetaModel(nn.Module):
 
         # DEBUG
         motion_emb_mask = self.mask_cond(motion_emb, force_mask=force_mask)
-        print(motion_emb_mask.shape)
-        print(motion_emb_mask)
         motion_emb = self.motion_process(motion_emb_mask)
         '''
         motion_emb = self.motion_process(
@@ -99,7 +97,7 @@ class MetaModel(nn.Module):
 
         print("MetaModel X Shape")
         print(x.shape)
-        
+
         output = self.mlp(x, emb)
 
         # Pass the output to a FC and reshape the output
