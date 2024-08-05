@@ -40,7 +40,7 @@ class MetaModel(nn.Module):
         self.embed_timestep = TimestepEmbeding(self.latent_dim)
         self.sparse_process = nn.Linear(self.sparse_dim, self.latent_dim)
         #
-        self.motion_process = nn.Linear(self.motion_dim * 7, self.latent_dim)
+        self.motion_process = nn.Linear(6552, self.latent_dim)
         self.output_process = nn.Linear(self.latent_dim, self.input_feats * 14)
 
     def mask_cond(self, cond, force_mask=True):
