@@ -12,7 +12,7 @@ class MLPblock(nn.Module):
         super().__init__()
 
         self.w_embed = w_embed
-        self.fc0 = nn.Conv1d(seq0, seq1, 1).cuda()
+        # self.fc0 = nn.Conv1d(seq0, seq1, 1).cuda()
 
         if self.w_embed:
             if first:
@@ -21,9 +21,9 @@ class MLPblock(nn.Module):
                 self.conct = nn.Identity().cuda()
             self.emb_fc = nn.Linear(dim, dim).cuda()
 
-        self.fc1 = nn.Linear(dim * 3, dim * 3).cuda()
-        self.norm0 = nn.LayerNorm(dim * 3).cuda()
-        self.norm1 = nn.LayerNorm(dim * 3).cuda()
+        self.fc1 = nn.Linear(dim, dim).cuda()
+        self.norm0 = nn.LayerNorm(dim).cuda()
+        self.norm1 = nn.LayerNorm(dim).cuda()
         self.act = nn.SiLU().cuda()
 
 
@@ -40,6 +40,7 @@ class MLPblock(nn.Module):
         x_ = self.norm0(x)
 
         # 我要开始魔改了
+        '''
         n = x_.shape[-1]
         in_process = nn.Linear(n, 14*312).cuda()
         x_ = in_process(x_)
@@ -48,9 +49,9 @@ class MLPblock(nn.Module):
         x_ = x_.reshape(-1, 14 * 312)
         out_process = nn.Linear(14 * 312, n).cuda()
         x_ = out_process(x_)
-
+        '''
         x_ = self.act(x_)
-        
+
         print(x.shape)
         print(x_.shape)
         x = x + x_
