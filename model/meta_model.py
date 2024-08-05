@@ -41,7 +41,7 @@ class MetaModel(nn.Module):
         self.sparse_process = nn.Linear(self.sparse_dim, self.latent_dim)
         #
         self.motion_process = nn.Linear(self.motion_dim, self.latent_dim)
-        self.output_process = nn.Linear(self.latent_dim, self.input_feats)
+        self.output_process = nn.Linear(self.latent_dim, self.input_feats * 14)
 
     def mask_cond(self, cond, force_mask=True):
         bs, n, c = cond.shape
@@ -66,6 +66,12 @@ class MetaModel(nn.Module):
         """
         emb = self.embed_timestep(timesteps)  # time step embedding : [1, bs, d]
 
+        # 把输入和条件的后两维展平
+        bs, nframes = x.shape[:2]
+        x = x.reshape(bs, -1)
+        motion_emb = motion_emb.reshape(bs, -1)
+        sparse_emb = sparse_emb.reshape(bs, -1)
+
         motion_emb = self.motion_process(
             self.mask_cond(motion_emb, force_mask=force_mask)
         )
@@ -79,11 +85,12 @@ class MetaModel(nn.Module):
 
         # Concat the sparse feature with input
         # x = torch.cat((sparse_emb, x), axis=-1)
-        x = torch.cat((motion_emb, sparse_emb, x), axis=-1)
+        x = torch.cat((motion_emb, sparse_emb, x), dim=-1)
         output = self.mlp(x, emb)
 
         # Pass the output to a FC and reshape the output
         output = self.output_process(output)
+        output = output.reshape(bs, nframes, -1)
         return output
 
 
