@@ -29,7 +29,7 @@ class MLPblock(nn.Module):
 
     def forward(self, inputs):
         print("MLPblock Inputs Shape")
-        print(inputs.shape)
+        print(inputs[0].shape)
         inputs = [input_tensor.to('cuda:0') for input_tensor in inputs]
 
         if self.w_embed:
