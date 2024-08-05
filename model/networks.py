@@ -37,7 +37,8 @@ class MLPblock(nn.Module):
         else:
             x = inputs
 
-        print(x)
+        print("MLPblock Inputs Shape")
+        print(x.shape)
         x_ = self.norm0(x)
 
         # 我要开始魔改了
