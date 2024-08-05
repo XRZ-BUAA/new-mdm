@@ -36,7 +36,9 @@ class MLPblock(nn.Module):
             x = inputs
 
         x_ = self.norm0(x)
+        x_ = x_.unsqueeze(2)
         x_ = self.fc0(x_)
+        x_ = x_.squeeze(2)
         x_ = self.act(x_)
         x = x + x_
 
@@ -75,7 +77,7 @@ class BaseMLP(nn.Module):
 
 
 class DiffMLP(nn.Module):
-    def __init__(self, latent_dim=1024, seq=98, num_layers=12):
+    def __init__(self, latent_dim=1024, seq=7, num_layers=12):
         super(DiffMLP, self).__init__()
 
         self.motion_mlp = BaseMLP(dim=latent_dim, seq=seq, num_layers=num_layers)
