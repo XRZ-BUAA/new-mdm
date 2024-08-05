@@ -40,22 +40,15 @@ class MetaModel(nn.Module):
         self.embed_timestep = TimestepEmbeding(self.latent_dim)
         self.sparse_process = nn.Linear(self.sparse_dim, self.latent_dim)
         #
-        self.motion_process = nn.Linear(self.motion_dim, self.latent_dim)
+        self.motion_process = nn.Linear(self.motion_dim * 7, self.latent_dim)
         self.output_process = nn.Linear(self.latent_dim, self.input_feats * 14)
 
     def mask_cond(self, cond, force_mask=True):
         bs, n = cond.shape
 
-        # DEBUG
-        print(cond)
-
         if force_mask:
-            print('Hei')
             return torch.zeros_like(cond)
         elif self.training and self.cond_mask_prob > 0.0:
-
-            # DEBUG
-            print(self.cond_mask_prob)
 
             mask = torch.bernoulli(
                 torch.ones(bs, device=cond.device) * self.cond_mask_prob
@@ -65,7 +58,6 @@ class MetaModel(nn.Module):
 
             return cond * (1.0 - mask)
         else:
-            print('I am here')
             return cond
 
     def forward(self, x, timesteps, motion_emb, sparse_emb, force_mask=False):
@@ -84,7 +76,7 @@ class MetaModel(nn.Module):
         sparse_emb = sparse_emb.reshape(bs, -1)
 
         # DEBUG
-        print(motion_emb)
+        print(motion_emb.shape)
 
         motion_emb = self.motion_process(
             self.mask_cond(motion_emb, force_mask=force_mask)
