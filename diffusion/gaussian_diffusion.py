@@ -1289,7 +1289,7 @@ class GaussianDiffusion:
         output = body_pose_local[:, :52, :].reshape(bs, seq, -1)
         return output
 
-    def training_losses(self, model, x_start, t, sparse, head, model_kwargs=None, noise=None, dataset=None):
+    def training_losses(self, model, x_start, t, sparse, model_kwargs=None, noise=None, dataset=None):
         """
         Compute training losses for a single timestep.
 
@@ -1297,7 +1297,6 @@ class GaussianDiffusion:
         :param x_start: the [N x C x ...] tensor of inputs.
         :param t: a batch of timestep indices.
         :param sparse:
-        :param head: 用于得到关节点全局位置从而计算损失
         :param model_kwargs: if not None, a dict of extra keyword arguments to
             pass to the model. This can be used for conditioning.
         :param noise: if specified, the specific Gaussian noise to try to remove.
