@@ -114,7 +114,7 @@ def main():
         )
 
     print("Training...")
-    TrainLoop(args, model, diffusion, dataloader, body_model).run_loop()
+    TrainLoop(args, model, diffusion, dataloader).run_loop()
     print("Done.")
 
 
