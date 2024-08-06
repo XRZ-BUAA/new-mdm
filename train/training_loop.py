@@ -104,7 +104,9 @@ class TrainLoop:
         self.opt.load_state_dict(state_dict)
 
     def run_loop(self):
-
+        
+        print("Number of Epoch:")
+        print(self.num_epochs)
         for epoch in range(self.num_epochs):
             print(f"Starting epoch {epoch}")
             for motion, sparse in tqdm(self.data):

@@ -1402,7 +1402,7 @@ class GaussianDiffusion:
             if self.lambda_vel > 0.:
                 target_vel = (target[:, 1:, ...] - target[:, :-1, ...])
                 model_output_vel = (model_output[:, 1:, ...] - model_output[:, :-1, ...])
-                terms["vel_mse"] = self.rot_loss(target_vel[:, :, 3:, :], model_output_vel[:, :, 3:, :])  # mean_flat((target_vel - model_output_vel) ** 2)
+                terms["vel_mse"] = self.rot_loss(target_vel[:, :, 6:], model_output_vel[:, :, 6:])  # mean_flat((target_vel - model_output_vel) ** 2)
 
             terms["loss"] = terms["rot_mse"] + terms.get('vb', 0.) +\
                             (self.lambda_vel * terms.get('vel_mse', 0.)) +\

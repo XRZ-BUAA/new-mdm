@@ -84,16 +84,32 @@ class BodyModel(torch.nn.Module):
                 **{
                     k: v
                     for k, v in body_params.items()
-                    if k in ["pose_body", "trans", "root_orient"]
+                    if k in ["pose_body", "pose_hand", "trans", "root_orient"]
                 }
             )
         return body_pose
 
 
-def load_diffusion_model(args):
+def predict_sparse(args, sparse_original):
+    predicted_sparse = sparse_original
+    sparse_per_frame = sparse_original[:, -1, :]
+    frame_count = 0
+    while frame_count < args.predict_length:
+        sparse_per_frame[:, :, :18] = predicted_sparse[:, -1, :18] + predicted_sparse[:, -1, 18:36]
+        ang_acc = predicted_sparse[:, -1, 18:36] - predicted_sparse[:, -2, 18:36]
+        sparse_per_frame[:, :, 18:36] = predicted_sparse[:, -1, 18:36] + ang_acc
+        sparse_per_frame[:, :, 36:45] = predicted_sparse[:, -1, 36:45] + predicted_sparse[:, -1, 45:54]
+        linear_acc = predicted_sparse[:, -1, 45:54] - predicted_sparse[:, -2, 45:54]
+        sparse_per_frame[:, :, 45:54] = predicted_sparse[:, -1, 45:54] + linear_acc
+        predicted_sparse = torch.cat((predicted_sparse, sparse_per_frame), dim=1)
+        frame_count += 1
+    return predicted_sparse
+
+
+def load_diffusion_model(args, body_model):
     print("Creating model and diffusion...")
     args.arch = args.arch[len("diffusion_") :]
-    model, diffusion = create_model_and_diffusion(args)
+    model, diffusion = create_model_and_diffusion(args, body_model)
 
     print(f"Loading checkpoints from [{args.model_path}]...")
     state_dict = torch.load(args.model_path, map_location="cpu")
@@ -104,92 +120,12 @@ def load_diffusion_model(args):
     return model, diffusion
 
 
-def cal_fulls(sample, body_model, gt_data):
-    B, J, C = sample.shape
-    motion = sample.squeeze().cuda()
-
-    model_rot_input = (
-        utils_transform.sixd2aa(motion.reshape(-1, 6).detach())
-        .reshape(motion.shape[0], -1)
-        .float()
-    )
-    gt_rot_input = (
-        utils_transform.sixd2aa(gt_data.reshape(-1, 6).detach())
-        .reshape(gt_data.shape[0], -1)
-        .float()
-    )
-    model_rot_input[..., 45:48] = gt_rot_input[..., 45:48]
-    model_rot_input[..., 60:72] = gt_rot_input[..., 60:72]
-
-    rotation_local_matrot = aa2matrot(
-        torch.tensor(model_rot_input).reshape(-1, 3)
-    ).reshape(model_rot_input.shape[0], -1, 9)
-    rotation_global_matrot = local2global_pose(
-        rotation_local_matrot, body_model.kintree_table[0].long()
-    )
-    head_rotation_global_matrot = rotation_global_matrot[:, [15], :, :]
-    T_head2world = head_rotation_global_matrot.clone().cuda()
-    t_head2world = T_head2world[:, :3, 3].clone()
-    body_pose_local = body_model(
-        {
-            "pose_body": model_rot_input[..., 3:72],
-            "root_orient": model_rot_input[..., :3],
-        }
-    ).Jtr
-
-    t_head2root = -body_pose_local[:, 15, :]
-    t_root2world = t_head2root + t_head2world.cuda()
-
-    predicted_body = body_model(
-        {
-            "pose_body": model_rot_input[..., 3:72],
-            "root_orient": model_rot_input[..., :3],
-            "trans": t_root2world,
-        }
-    )
-
-    rotation_global_6d = utils_transform.matrot2sixd(
-        rotation_global_matrot.reshape(-1, 3, 3)
-    ).reshape(rotation_global_matrot.shape[0], -1, 6)
-    rotation_velocity_global_matrot = torch.matmul(
-        torch.inverse(rotation_global_matrot[:-1]),
-        rotation_global_matrot[1:],
-    )
-    rotation_velocity_global_6d = utils_transform.matrot2sixd(
-        rotation_velocity_global_matrot.reshape(-1, 3, 3)
-    ).reshape(rotation_velocity_global_matrot.shape[0], -1, 6)
-
-    position_global_full_gt_world = predicted_body.Jtr[
-                                    :, :24, :
-                                    ]
-    num_frames = position_global_full_gt_world.shape[0] - 1
-
-    output = torch.cat(
-        [
-            rotation_global_6d[1:, :24, :].reshape(num_frames, -1),
-            rotation_velocity_global_6d[:, :24, :].reshape(num_frames, -1),
-            position_global_full_gt_world[1:, :24, :].reshape(
-                num_frames, -1
-            ),
-            position_global_full_gt_world[1:, :24, :].reshape(
-                num_frames, -1
-            )
-            - position_global_full_gt_world[:-1, :24, :].reshape(
-                num_frames, -1
-            ),
-        ],
-        dim=-1,
-    )
-    return output.reshape(B, J, -1)
-
-
 def non_overlapping_test(
         args,
         data,
         sample_fn,
         dataset,
         model,
-        body_model,
         num_per_batch=256
 ):
     gt_data, sparse_original, body_param, head_motion, filename = (
@@ -206,45 +142,14 @@ def non_overlapping_test(
 
     output_samples = []
     count = 0
-
-    gt_splits = []
     sparse_splits = []
-
     flag_index = None
 
     # 没有前序输出时填入随机数
-    pre_sample = torch.randn(num_per_batch, args.input_motion_length / 2, args.motion_nfeat)
-
-    if args.input_motion_length / 2 <= num_frames:
-        while count < num_frames:
-            if count + args.input_motion_length / 2 > num_frames:
-                tmp_k = num_frames - args.input_motion_length / 2
-                sub_sparse = sparse_original[
-                    :, tmp_k + args.input_motion_length / 2
-                ]
-                sub_gt = gt_data[
-                    :, tmp_k : tmp_k + args.input_motion_length / 2 + 1
-                ]
-
-                flag_index = count - tmp_k
-            else:
-                sub_sparse = sparse_original[
-                    :, count + args.input_motion_length / 2
-                ]
-
-                sub_gt = gt_data[
-                    :, count: count + args.input_motion_length / 2 + 1
-                ]
-            sparse_splits.append(sub_sparse)
-            gt_splits.append(sub_gt)
-            count += args.input_motion_length / 2
-    else:
-        sub_sparse = sparse_original[:, num_frames]
-        flag_index = args.input_motion_length / 2 - num_frames
-        tmp_init = gt_data[:, :1].repeat(1, flag_index, 1).clone()
-        sub_gt = torch.cat([tmp_init, gt_data], dim=1)
-        sparse_splits = [sub_sparse]
-        gt_splits = [sub_gt]
+    pre_sample = torch.randn(num_per_batch, args.pre_motion_length, args.motion_nfeat)
+    # 头和两手已知
+    pre_sample[..., 90: 96] = gt_data[:num_per_batch, :args.pre_motion_length, 90: 96]
+    pre_sample[..., 120: 132] = gt_data[:num_per_batch, :args.pre_motion_length, 120: 132]
 
     n_steps = len(sparse_splits) // num_per_batch
     if len(sparse_splits) % num_per_batch > 0:
@@ -266,15 +171,7 @@ def non_overlapping_test(
             dim=0,
         )
 
-        gt_per_batch = torch.cat(
-            gt_splits[
-                step_index * num_per_batch: (step_index + 1) * num_per_batch
-            ],
-            dim=0,
-        )
         new_batch_size = sparse_per_batch.shape[0]
-
-        full_per_batch = cal_fulls(pre_sample, body_model, gt_per_batch[:, :-1])
 
         model_kwargs = {}
         model_kwargs['y'] = {}
@@ -293,7 +190,6 @@ def non_overlapping_test(
         sample = sample_fn(
             model,
             (new_batch_size, args.input_motion_length, args.motion_nfeat),
-            full=full_per_batch,
             sparse=sparse_per_batch,
             clip_denoised=False,
             model_kwargs=model_kwargs,
@@ -322,34 +218,6 @@ def non_overlapping_test(
 
     return output_samples, body_param, head_motion, filename
 
-'''
-def overlapping_test(
-        args,
-        data,
-        sample_fn,
-        dataset,
-        model,
-        body_model,
-        sld_wind_size=70,
-):
-    gt_data, sparse_original, body_param, head_motion, filename = (
-        data[0],
-        data[1],
-        data[2],
-        data[3],
-        data[4],
-    )
-    gt_data = gt_data.cuda().float()
-    sparse_original = sparse_original.cuda().float()
-    head_motion = head_motion.cuda().float()
-    num_frames = head_motion.shape[0]
-
-    output_samples = []
-    count = 0
-    sparse_splits = []
-    flag_index = None
-    
-'''
 
 def evaluate_prediction(
     args,
@@ -459,7 +327,7 @@ def main():
     for metric in all_metrics:
         log[metric] = 0
 
-    model, diffusion = load_diffusion_model(args)
+    model, diffusion = load_diffusion_model(args, body_model)
     sample_fn = diffusion.p_sample_loop
 
     for sample_index in tqdm(range(len(dataset))):
@@ -473,7 +341,7 @@ def main():
             args.num_per_batch
         )
 
-        sample = torch.cat(output, axis=0)
+        sample = torch.cat(output, dim=0)
         instance_log = evaluate_prediction(
             args,
             all_metrics,
