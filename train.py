@@ -95,7 +95,7 @@ def main():
     num_gpus = torch.cuda.device_count()
     args.num_workers = args.num_workers * num_gpus
 
-    model, diffusion = create_model_and_diffusion(args)
+    model, diffusion = create_model_and_diffusion(args, body_model)
 
     if num_gpus > 1:
         print("Let's use", torch.cuda.device_count(), "GPUs!")

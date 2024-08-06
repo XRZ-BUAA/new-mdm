@@ -22,9 +22,9 @@ def load_model_wo_clip(model, state_dict):
     assert all([k.startswith("clip_model.") for k in missing_keys])
 
 
-def create_model_and_diffusion(args):
+def create_model_and_diffusion(args, body_model):
     model = MetaModel(**get_model_args(args))
-    diffusion = create_gaussian_diffusion(args)
+    diffusion = create_gaussian_diffusion(args, body_model)
     return model, diffusion
 
 
@@ -43,7 +43,7 @@ def get_model_args(args):
     }
 
 
-def create_gaussian_diffusion(args):
+def create_gaussian_diffusion(args, body_model):
     predict_xstart = True
     steps = args.diffusion_steps  # 1000
     scale_beta = 1.0
@@ -58,6 +58,7 @@ def create_gaussian_diffusion(args):
         timestep_respacing = [steps]
 
     return SpacedDiffusion(
+        body_model=body_model,
         dataset=args.dataset,
         use_timesteps=space_timesteps(steps, timestep_respacing),
         betas=betas,

@@ -122,6 +122,7 @@ class GaussianDiffusion:
     def __init__(
         self,
         *,
+        body_model, # 用于计算损失函数
         dataset,    # 超，鬼晓得这是干嘛的
         betas,
         model_mean_type,
@@ -138,6 +139,7 @@ class GaussianDiffusion:
         lambda_vel_rcxyz=0.,
         lambda_fc=0.,
     ):
+        self.body_model = body_model
         self.dataset = dataset
         self.model_mean_type = model_mean_type
         self.model_var_type = model_var_type
@@ -1272,12 +1274,12 @@ class GaussianDiffusion:
         return {"output": output, "pred_xstart": out["pred_xstart"]}
 
     # 通过关节点6d局部旋转计算关节点相对根关节的位置，用于计算损失函数
-    def get_local_pos(self, rot, body_model):
+    def get_local_pos(self, rot):
         bs, seq = rot.shape[:2]
         rot = rot.reshape(-1, 52, 6)
         rot_input = utils_transform.sixd2aa(rot, batch=True).flatten(1, 2)
 
-        body_pose_local = body_model(
+        body_pose_local = self.body_model(
             {
                 "pose_body": rot_input[..., 3:66],
                 "pose_hand": rot_input[..., 66:156],
@@ -1287,7 +1289,7 @@ class GaussianDiffusion:
         output = body_pose_local[:, :52, :].reshape(bs, seq, -1)
         return output
 
-    def training_losses(self, model, x_start, t, sparse, head, body_model, model_kwargs=None, noise=None, dataset=None):
+    def training_losses(self, model, x_start, t, sparse, head, model_kwargs=None, noise=None, dataset=None):
         """
         Compute training losses for a single timestep.
 
@@ -1363,13 +1365,13 @@ class GaussianDiffusion:
             target_pos, model_output_pos = None, None
 
             if self.lambda_rcxyz > 0.:
-                target_pos = self.get_local_pos(target, body_model)
-                model_output_pos = self.get_local_pos(model_output, body_model)
+                target_pos = self.get_local_pos(target)
+                model_output_pos = self.get_local_pos(model_output)
                 terms["rcxyz_mse"] = self.fk_loss(target_pos, model_output_pos)
 
             if self.lambda_vel_rcxyz > 0.:
-                target_pos = self.get_local_pos(target, body_model) if target_pos is None else target_pos
-                model_output_pos = self.get_local_pos(model_output, body_model) if model_output_pos is None \
+                target_pos = self.get_local_pos(target) if target_pos is None else target_pos
+                model_output_pos = self.get_local_pos(model_output) if model_output_pos is None \
                     else model_output_pos
 
                 target_pos_vel = (target_pos[:, 1:, :] - target_pos[:, :-1, :])
@@ -1378,8 +1380,8 @@ class GaussianDiffusion:
 
             if self.lambda_fc > 0.:
                 torch.autograd.set_detect_anomaly(True)
-                target_pos = self.get_local_pos(target, body_model) if target_pos is None else target_pos
-                model_output_pos = self.get_local_pos(model_output, body_model) if model_output_pos is None \
+                target_pos = self.get_local_pos(target) if target_pos is None else target_pos
+                model_output_pos = self.get_local_pos(model_output) if model_output_pos is None \
                     else model_output_pos
                 bs, seq = target_pos.shape[:2]
                 target_pos = target_pos.reshape(bs, seq, -1, 3)
