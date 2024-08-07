@@ -99,8 +99,8 @@ def predict_sparse(args, sparse_original):
         print("Sparse Per Frame Shape")
         print(sparse_per_frame.shape)
         print("Predicted Sparse Shape")
-        print(predicted_sparse)
-        
+        print(predicted_sparse.shape)
+
         sparse_per_frame[:, :, :18] = predicted_sparse[:, -1, :18] + predicted_sparse[:, -1, 18:36]
         ang_acc = predicted_sparse[:, -1, 18:36] - predicted_sparse[:, -2, 18:36]
         sparse_per_frame[:, :, 18:36] = predicted_sparse[:, -1, 18:36] + ang_acc
