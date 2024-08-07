@@ -130,7 +130,7 @@ def non_overlapping_test(
         num_per_batch=256
 ):
     gt_data, sparse_original, body_param, head_motion, filename = (
-        data[0],
+        data[0].unsqueeze(0),
         data[1],
         data[2],
         data[3],
