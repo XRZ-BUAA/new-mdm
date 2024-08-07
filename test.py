@@ -93,7 +93,7 @@ class BodyModel(torch.nn.Module):
 
 def predict_sparse(args, sparse_original):
     predicted_sparse = sparse_original
-    sparse_per_frame = sparse_original[:, -1, :]
+    sparse_per_frame = sparse_original[:, -1, :].unsqueeze(1)
     frame_count = 0
     while frame_count < args.predict_length:
         print("Sparse Per Frame Shape")
