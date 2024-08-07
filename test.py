@@ -209,6 +209,10 @@ def non_overlapping_test(
             dim=0,
         )
 
+        print("Sparse Per Batch Shape")
+        print(sparse_per_batch.shape)
+        print("GT Per Batch Shape")
+        print(gt_per_batch.shape)
         assert sparse_per_batch.shape[0] == gt_per_batch.shape[0]
         new_batch_size = sparse_per_batch.shape[0]
 
