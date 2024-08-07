@@ -38,7 +38,7 @@ class MetaModel(nn.Module):
         self.sparse_process = nn.Linear(self.sparse_dim, self.latent_dim)
         self.output_process = nn.Linear(self.latent_dim, self.input_feats)
 
-    def mask_cond_sparse(self, cond, force_mask=True):
+    def mask_cond_sparse(self, cond, force_mask=True, y=None):
         bs, n, c = cond.shape
         if force_mask:
             return torch.zeros_like(cond)

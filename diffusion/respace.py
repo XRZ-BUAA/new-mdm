@@ -1,9 +1,5 @@
 # This code is based on https://github.com/openai/guided-diffusion
 
-'''
-From XRZ:
-这个 AGRoL 稍做了一些改动
-'''
 import numpy as np
 import torch as th
 
