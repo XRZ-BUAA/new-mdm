@@ -141,6 +141,11 @@ def non_overlapping_test(
     head_motion = head_motion.cuda().float()
     num_frames = head_motion.shape[0]
 
+    print("GT Data Shape")
+    print(gt_data.shape)
+    print("Sparse Original Shape")
+    print(sparse_original.shape)
+
     output_samples = []
     count = 0
     sparse_splits = []
@@ -209,10 +214,10 @@ def non_overlapping_test(
             dim=0,
         )
 
-        print("Sparse Per Batch Shape")
-        print(sparse_per_batch.shape)
-        print("GT Per Batch Shape")
-        print(gt_per_batch.shape)
+        # print("Sparse Per Batch Shape")
+        # print(sparse_per_batch.shape)
+        # print("GT Per Batch Shape")
+        # print(gt_per_batch.shape)
         assert sparse_per_batch.shape[0] == gt_per_batch.shape[0]
         new_batch_size = sparse_per_batch.shape[0]
 
