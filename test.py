@@ -199,7 +199,7 @@ def non_overlapping_test(
 
     sample = None
     pre_sample = None
-
+    first = True
     for step_index in range(n_steps):
         sparse_per_batch = torch.cat(
             sparse_splits[
@@ -284,10 +284,15 @@ def non_overlapping_test(
         else:
             sample = sample.reshape(-1, args.motion_nfeat)
 
-        if not args.no_normalization:
-            output_samples.append(dataset.inv_transform(sample.cpu().float()))
+        if first:
+            sample_split = sample.clone().detach().cpu().float()
+            first = False
         else:
-            output_samples.append(sample.cpu().float())
+            sample_split = sample[:, -args.predict_length, :].clone().detach().cpu().float()
+        if not args.no_normalization:
+            output_samples.append(dataset.inv_transform(sample_split))
+        else:
+            output_samples.append(sample_split)
 
     return output_samples, body_param, head_motion, filename
 
@@ -419,6 +424,7 @@ def main():
         )
 
         sample = torch.cat(output, dim=0)
+
         instance_log = evaluate_prediction(
             args,
             all_metrics,
