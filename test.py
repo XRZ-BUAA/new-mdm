@@ -142,10 +142,12 @@ def non_overlapping_test(
     head_motion = head_motion.cuda().float()
     num_frames = head_motion.shape[0]
 
-    # print("GT Data Shape")
-    # print(gt_data.shape)
-    # print("Sparse Original Shape")
-    # print(sparse_original.shape)
+    print("GT Data Shape")
+    print(gt_data.shape)
+    print("Sparse Original Shape")
+    print(sparse_original.shape)
+    print("Head Motion Shape")
+    print(head_motion.shape)
 
     output_samples = []
     count = 0
