@@ -311,19 +311,21 @@ class GaussianDiffusion:
                  - 'log_variance': the log of 'variance'.
                  - 'pred_xstart': the prediction for x_0.
         """
-        if model_kwargs is None:
-            model_kwargs = {}
 
         B, C = x.shape[:2]
         assert t.shape == (B,)
-        # 改
-        model_output = model(x, self._scale_timesteps(t), sparse, **model_kwargs)
 
-        if 'inpainting_mask' in model_kwargs['y'].keys() and 'inpainted_motion' in model_kwargs['y'].keys():
-            inpainting_mask, inpainted_motion = model_kwargs['y']['inpainting_mask'], model_kwargs['y']['inpainted_motion']
-            assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for mow!'
-            assert model_output.shape == inpainting_mask.shape == inpainted_motion.shape
-            model_output = (model_output * ~inpainting_mask) + (inpainted_motion * inpainting_mask)
+        if model_kwargs is not None:
+            model_output = model(x, self._scale_timesteps(t), sparse, **model_kwargs)
+        else:
+            model_output = model(x, self._scale_timesteps(t), sparse)
+
+        if model_kwargs is not None:
+            if 'inpainting_mask' in model_kwargs['y'].keys() and 'inpainted_motion' in model_kwargs['y'].keys():
+                inpainting_mask, inpainted_motion = model_kwargs['y']['inpainting_mask'], model_kwargs['y']['inpainted_motion']
+                assert self.model_mean_type == ModelMeanType.START_X, 'This feature supports only X_start pred for mow!'
+                assert model_output.shape == inpainting_mask.shape == inpainted_motion.shape
+                model_output = (model_output * ~inpainting_mask) + (inpainted_motion * inpainting_mask)
 
         if self.model_var_type in [ModelVarType.LEARNED, ModelVarType.LEARNED_RANGE]:
             assert model_output.shape == (B, C * 2, *x.shape[2:])
