@@ -289,6 +289,7 @@ def non_overlapping_test(
             first = False
         else:
             sample_split = sample[:, -args.predict_length, :].clone().detach().cpu().float()
+            
         if not args.no_normalization:
             output_samples.append(dataset.inv_transform(sample_split))
         else:
