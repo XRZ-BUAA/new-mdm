@@ -93,21 +93,17 @@ class BodyModel(torch.nn.Module):
 
 def predict_sparse(args, sparse_original):
     predicted_sparse = sparse_original
-    sparse_per_frame = sparse_original[:, -1, :].unsqueeze(1)
+    sparse_per_frame = sparse_original[:, -1, :]
     frame_count = 0
     while frame_count < args.predict_length:
-        print("Sparse Per Frame Shape")
-        print(sparse_per_frame.shape)
-        print("Predicted Sparse Shape")
-        print(predicted_sparse.shape)
 
-        sparse_per_frame[:, :, :18] = predicted_sparse[:, -1, :18] + predicted_sparse[:, -1, 18:36]
+        sparse_per_frame[:, :18] = predicted_sparse[:, -1, :18] + predicted_sparse[:, -1, 18:36]
         ang_acc = predicted_sparse[:, -1, 18:36] - predicted_sparse[:, -2, 18:36]
-        sparse_per_frame[:, :, 18:36] = predicted_sparse[:, -1, 18:36] + ang_acc
-        sparse_per_frame[:, :, 36:45] = predicted_sparse[:, -1, 36:45] + predicted_sparse[:, -1, 45:54]
+        sparse_per_frame[:, 18:36] = predicted_sparse[:, -1, 18:36] + ang_acc
+        sparse_per_frame[:, 36:45] = predicted_sparse[:, -1, 36:45] + predicted_sparse[:, -1, 45:54]
         linear_acc = predicted_sparse[:, -1, 45:54] - predicted_sparse[:, -2, 45:54]
-        sparse_per_frame[:, :, 45:54] = predicted_sparse[:, -1, 45:54] + linear_acc
-        predicted_sparse = torch.cat((predicted_sparse, sparse_per_frame), dim=1)
+        sparse_per_frame[:, 45:54] = predicted_sparse[:, -1, 45:54] + linear_acc
+        predicted_sparse = torch.cat((predicted_sparse, sparse_per_frame.unsqueeze(1)), dim=1)
         frame_count += 1
     return predicted_sparse
 
