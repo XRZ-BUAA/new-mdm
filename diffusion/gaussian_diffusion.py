@@ -1360,7 +1360,7 @@ class GaussianDiffusion:
 
             terms["rot_mse"] = self.rot_loss(target, model_output)
 
-            # 从这里开始AGRoL就没抄了
+            # 几何损失
             target_pos, model_output_pos = None, None
 
             if self.lambda_rcxyz > 0.:

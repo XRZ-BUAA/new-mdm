@@ -104,7 +104,7 @@ class TrainLoop:
         self.opt.load_state_dict(state_dict)
 
     def run_loop(self):
-        
+
         print("Number of Epoch:")
         print(self.num_epochs)
         for epoch in range(self.num_epochs):

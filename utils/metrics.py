@@ -106,8 +106,8 @@ def handpe(
     fps,
 ):
     pos_error_hands = torch.mean(
-        torch.sqrt(torch.sum(torch.square(gt_position - predicted_position), axis=-1))[
-            ..., [20, 21]
+        torch.sqrt(torch.sum(torch.square(gt_position - predicted_position), dim=-1))[
+            ..., 20:52
         ]
     )
     return pos_error_hands
@@ -125,7 +125,7 @@ def upperpe(
     fps,
 ):
     upper_body_error = torch.mean(
-        torch.sqrt(torch.sum(torch.square(gt_position - predicted_position), axis=-1))[
+        torch.sqrt(torch.sum(torch.square(gt_position - predicted_position), dim=-1))[
             ..., upper_index
         ]
     )

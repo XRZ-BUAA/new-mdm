@@ -15,6 +15,7 @@ from model.networks import PureMLP
 from human_body_prior.body_model.body_model import BodyModel as BM
 from human_body_prior.tools.rotation_tools import aa2matrot, local2global_pose
 from utils import utils_transform
+from utils.util_plot import plot_skeleton_by_pos
 from utils.metrics import get_metric_function
 
 device = torch.device("cuda")
@@ -143,13 +144,41 @@ def non_overlapping_test(
     output_samples = []
     count = 0
     sparse_splits = []
+    gt_splits = []
     flag_index = None
 
-    # 没有前序输出时填入随机数
-    pre_sample = torch.randn(num_per_batch, args.pre_motion_length, args.motion_nfeat)
-    # 头和两手已知
-    pre_sample[..., 90: 96] = gt_data[:num_per_batch, :args.pre_motion_length, 90: 96]
-    pre_sample[..., 120: 132] = gt_data[:num_per_batch, :args.pre_motion_length, 120: 132]
+    stride = args.predict_length
+
+    if args.pre_motion_length <= num_frames:
+        while count < num_frames:
+            if count + args.pre_motion_length > num_frames:
+                tmp_k = num_frames - args.pre_motion_length
+                sub_sparse = sparse_original[
+                    :, tmp_k: tmp_k + args.pre_motion_length
+                ]
+                sub_gt = gt_data[
+                    :, tmp_k: tmp_k + args.pre_motion_length
+                ]
+                flag_index = count - tmp_k
+            else:
+                sub_sparse = sparse_original[
+                    :, count: count + args.pre_motion_length
+                ]
+                sub_gt = gt_data[
+                    :, count: count + args.pre_motion_length
+                ]
+            sparse_splits.append(sub_sparse)
+            gt_splits.append(sub_gt)
+            count += stride
+
+    else:
+        flag_index = args.pre_motion_length - num_frames
+        tmp_init = sparse_original[:, :1].repeat(1, flag_index, 1).clone()
+        sub_sparse = torch.cat([tmp_init, sparse_original], dim=1)
+        sparse_splits = [sub_sparse]
+        tmp_init = gt_data[:, :1].repeat(1, flag_index, 1).clone()
+        sub_gt = torch.cat([tmp_init, gt_data], dim=1)
+        gt_splits = [sub_gt]
 
     n_steps = len(sparse_splits) // num_per_batch
     if len(sparse_splits) % num_per_batch > 0:
@@ -163,6 +192,8 @@ def non_overlapping_test(
         noise = None
 
     sample = None
+    pre_sample = None
+
     for step_index in range(n_steps):
         sparse_per_batch = torch.cat(
             sparse_splits[
@@ -171,26 +202,57 @@ def non_overlapping_test(
             dim=0,
         )
 
+        gt_per_batch = torch.cat(
+            gt_splits[
+                step_index * num_per_batch: (step_index + 1) * num_per_batch
+            ],
+            dim=0,
+        )
+
+        assert sparse_per_batch.shape[0] == gt_per_batch.shape[0]
         new_batch_size = sparse_per_batch.shape[0]
 
         model_kwargs = {}
         model_kwargs['y'] = {}
-        model_kwargs['y']['inpainted_motion'] = torch.randn(num_per_batch, args.input_motion_length, args.motion_nfeat)
+        model_kwargs['y']['inpainted_motion'] = torch.randn(
+            new_batch_size,
+            args.input_motion_length,
+            args.motion_nfeat
+        ).cuda()
+        model_kwargs['y']['inpainting_mask'] = torch.zeros(
+            (
+                new_batch_size,
+                args.input_motion_length,
+                args.motion_nfeat
+            ),
+            dtype=torch.bool
+        )
+        if pre_sample is not None:
+            model_kwargs['y']['inpainted_motion'][:, : args.pre_motion_length, :] = pre_sample[
+                                                                                    :,
+                                                                                    -args.pre_motion_length:,
+                                                                                    :
+                                                                                    ]
 
-        model_kwargs['y']['inpainted_motion'][:, : args.input_motion_length / 2, :] = pre_sample
-        model_kwargs['y']['inpainted_motion'][:, args.input_motion_length / 2, 90:96] = gt_data[:, -1, 45:48]
-        model_kwargs['y']['inpainted_motion'][:, args.input_motion_length / 2, 120:144] = gt_data[:, -1, 60:72]
+        model_kwargs['y']['inpainted_motion'][:, : args.pre_motion_length, 90:96] = gt_per_batch[
+                                                                                    :,
+                                                                                    : args.pre_motion_length,
+                                                                                    90:96
+                                                                                    ]
+        model_kwargs['y']['inpainted_motion'][:, : args.pre_motion_length, 120:132] = gt_per_batch[
+                                                                                    :,
+                                                                                    : args.pre_motion_length,
+                                                                                    120:132
+                                                                                    ]
 
-        model_kwargs['y']['inpainting_mask'] = torch.ones_like(model_kwargs['y']['inpainted_motion'], dtype=torch.bool,
-                                                               device=model_kwargs['y']['inpainted_motion'].device)
-        model_kwargs['y']['inpainting_mask'][:, : args.input_motion_length / 2, :] = False
-        model_kwargs['y']['inpainting_mask'][:, args.input_motion_length / 2, 45:48] = False
-        model_kwargs['y']['inpainting_mask'][:, args.input_motion_length / 2, 60:72] = False
+        model_kwargs['y']['inpainting_mask'][:, : args.pre_motion_length, :] = True
+        model_kwargs['y']['inpainting_mask'][:, : args.pre_motion_length, 90:96] = True
+        model_kwargs['y']['inpainting_mask'][:, : args.pre_motion_length, 120:132] = True
 
         sample = sample_fn(
             model,
             (new_batch_size, args.input_motion_length, args.motion_nfeat),
-            sparse=sparse_per_batch,
+            sparse=predict_sparse(args, sparse_per_batch),
             clip_denoised=False,
             model_kwargs=model_kwargs,
             skip_timesteps=0,
@@ -201,7 +263,7 @@ def non_overlapping_test(
             const_noise=False,
         )
 
-        pre_sample = sample[:, args.input_motion_length / 2: args.input_motion_length, :]
+        pre_sample = sample.clone().detach()
 
         if flag_index is not None and step_index == n_steps - 1:
             last_batch = sample[-1]
@@ -246,6 +308,7 @@ def evaluate_prediction(
         {
             "pose_body": model_rot_input[..., 3:66],
             "root_orient": model_rot_input[..., :3],
+            "pose_hand": model_rot_input[..., 66:156]
         }
     ).Jtr
 
@@ -257,10 +320,11 @@ def evaluate_prediction(
         {
             "pose_body": model_rot_input[..., 3:66],
             "root_orient": model_rot_input[..., :3],
+            "pose_hand": model_rot_input[..., 66:156],
             "trans": t_root2world,
         }
     )
-    predicted_position = predicted_body.Jtr[:, :22, :]
+    predicted_position = predicted_body.Jtr[:, :52, :]
 
     # Get the predicted position and rotation
     predicted_angle = model_rot_input
@@ -271,7 +335,10 @@ def evaluate_prediction(
 
     # Get the  ground truth position from the model
     gt_body = body_model(body_param)
-    gt_position = gt_body.Jtr[:, :22, :]
+    gt_position = gt_body.Jtr[:, :52, :]
+
+    # 可视化
+    plot_skeleton_by_pos(predicted_position, gt_position)
 
     gt_angle = body_param["pose_body"]
     gt_root_angle = body_param["root_orient"]
@@ -279,7 +346,7 @@ def evaluate_prediction(
     predicted_root_angle = predicted_angle[:, :3]
     predicted_angle = predicted_angle[:, 3:]
 
-    upper_index = [3, 6, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23]
+    upper_index = [3, 6, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
     lower_index = [0, 1, 2, 4, 5, 7, 8, 10, 11]
     eval_log = {}
     for metric in metrics:
@@ -337,7 +404,6 @@ def main():
             sample_fn,
             dataset,
             model,
-            body_model,
             args.num_per_batch
         )
 
