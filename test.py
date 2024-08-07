@@ -276,20 +276,22 @@ def non_overlapping_test(
 
         pre_sample = sample.clone().detach()
 
-        if flag_index is not None and step_index == n_steps - 1:
-            last_batch = sample[-1]
-            last_batch = last_batch[flag_index:]
-            sample = sample[:-1].reshape(-1, args.motion_nfeat)
-            sample = torch.cat([sample, last_batch], dim=0)
-        else:
-            sample = sample.reshape(-1, args.motion_nfeat)
-
         if first:
-            sample_split = sample.clone().detach().cpu().float()
+            sample_split = sample.clone().detach()
             first = False
         else:
-            sample_split = sample[:, -args.predict_length, :].clone().detach().cpu().float()
-            
+            sample_split = sample[:, -args.predict_length, :].clone().detach()
+
+        sample_split = sample_split.reshape(-1, args.motion_nfeat).cpu().float()
+
+        # if flag_index is not None and step_index == n_steps - 1:
+        #     last_batch = sample[-1]
+        #     last_batch = last_batch[flag_index:]
+        #     sample = sample[:-1].reshape(-1, args.motion_nfeat)
+        #     sample = torch.cat([sample, last_batch], dim=0)
+        # else:
+        #     sample = sample.reshape(-1, args.motion_nfeat)
+
         if not args.no_normalization:
             output_samples.append(dataset.inv_transform(sample_split))
         else:
