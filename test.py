@@ -282,7 +282,7 @@ def non_overlapping_test(
             sample_split = sample.clone().detach()
             first = False
         else:
-            sample_split = sample[:, -args.predict_length, :].clone().detach()
+            sample_split = sample[:, -args.predict_length:, :].clone().detach()
 
         sample_split = sample_split.reshape(-1, args.motion_nfeat).cpu().float()
 
@@ -314,12 +314,18 @@ def evaluate_prediction(
     filename,
 ):
     motion_pred = sample.squeeze().cuda()
+
+    print("motion_pre Shape")
+    print(motion_pred.shape)
     # Get the  prediction from the model
     model_rot_input = (
         utils_transform.sixd2aa(motion_pred.reshape(-1, 6).detach())
         .reshape(motion_pred.shape[0], -1)
         .float()
     )
+
+    print("model_rot_input Shape")
+    print(model_rot_input.shape)
 
     T_head2world = head_motion.clone().cuda()
     t_head2world = T_head2world[:, :3, 3].clone()
@@ -333,8 +339,17 @@ def evaluate_prediction(
         }
     ).Jtr
 
+    print("body_pose_local Shape")
+    print(body_pose_local.shape)
+
     # Get the offset in global coordiante system between head and body_world.
     t_head2root = -body_pose_local[:, 15, :]
+
+    print("t_head2root Shape")
+    print(t_head2root.shape)
+    print("t_head2world Shape")
+    print(t_head2world.shape)
+
     t_root2world = t_head2root + t_head2world.cuda()
 
     predicted_body = body_model(
