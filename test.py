@@ -155,29 +155,37 @@ def non_overlapping_test(
     gt_splits = []
     flag_index = None
 
-    stride = args.predict_length
-
     if args.pre_motion_length <= num_frames:
-        while count < num_frames:
-            if count + args.pre_motion_length > num_frames:
-                tmp_k = num_frames - args.pre_motion_length
-                sub_sparse = sparse_original[
-                    :, tmp_k: tmp_k + args.pre_motion_length
-                ]
-                sub_gt = gt_data[
-                    :, tmp_k: tmp_k + args.pre_motion_length
-                ]
-                flag_index = count - tmp_k
-            else:
-                sub_sparse = sparse_original[
-                    :, count: count + args.pre_motion_length
-                ]
-                sub_gt = gt_data[
-                    :, count: count + args.pre_motion_length
-                ]
+        # while count < num_frames:
+        #     if count + args.pre_motion_length > num_frames:
+        #         tmp_k = num_frames - args.pre_motion_length
+        #         sub_sparse = sparse_original[
+        #             :, tmp_k: tmp_k + args.pre_motion_length
+        #         ]
+        #         sub_gt = gt_data[
+        #             :, tmp_k: tmp_k + args.pre_motion_length
+        #         ]
+        #         flag_index = count - tmp_k
+        #     else:
+        #         sub_sparse = sparse_original[
+        #             :, count: count + args.pre_motion_length
+        #         ]
+        #         sub_gt = gt_data[
+        #             :, count: count + args.pre_motion_length
+        #         ]
+        #     sparse_splits.append(sub_sparse)
+        #     gt_splits.append(sub_gt)
+        #     count += stride
+        while count + args.pre_motion_length <= num_frames:
+            sub_sparse = sparse_original[
+                         :, count: count + args.pre_motion_length
+                         ]
+            sub_gt = gt_data[
+                     :, count: count + args.pre_motion_length
+                     ]
             sparse_splits.append(sub_sparse)
             gt_splits.append(sub_gt)
-            count += stride
+            count += args.predict_length
 
     else:
         flag_index = args.pre_motion_length - num_frames
