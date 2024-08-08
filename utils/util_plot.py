@@ -106,9 +106,10 @@ def plot_animation_by_pos(pred_jtr, gt_jtr, save_path):
     fig = plt.figure()
     gt_ax = fig.add_subplot(111, projection='3d')
     pred_ax = fig.add_subplot(122, projection='3d')
-    # 设置视角
-    gt_ax.view_init(elev=20, azim=30)
-    pred_ax.view_init(elev=20, azim=330)
+    # # 设置视角
+    # gt_ax.view_init(elev=20, azim=30)
+    # pred_ax.view_init(elev=20, azim=330)
+    fig.tight_layout()
 
     for ax in [pred_ax, gt_ax]:
         ax.set_xlabel('X')
