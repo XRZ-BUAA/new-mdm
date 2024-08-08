@@ -106,6 +106,9 @@ def plot_animation_by_pos(pred_jtr, gt_jtr, save_path):
     fig = plt.figure()
     gt_ax = fig.add_subplot(111, projection='3d')
     pred_ax = fig.add_subplot(122, projection='3d')
+    # 设置视角
+    gt_ax.view_init(elev=20, azim=30)
+    pred_ax.view_init(elev=20, azim=330)
 
     for ax in [pred_ax, gt_ax]:
         ax.set_xlabel('X')
@@ -120,11 +123,11 @@ def plot_animation_by_pos(pred_jtr, gt_jtr, save_path):
         pred_ax.cla()
         gt_ax.cla()
 
-        pred_ax.scatter(p1[:22, 0], p1[:22, 1], p1[:22, 2], c='r', s=100, label='Predicted Motion')
-        gt_ax.scatter(p2[:22, 0], p2[:22, 1], p2[:22, 2], s=100, c='b', label='Ground Truth')
+        pred_ax.scatter(p1[:22, 0], p1[:22, 1], p1[:22, 2], c='r', s=50, label='Predicted Motion')
+        gt_ax.scatter(p2[:22, 0], p2[:22, 1], p2[:22, 2], s=50, c='b', label='Ground Truth')
 
-        pred_ax.scatter(p1[22:, 0], p1[22:, 1], p1[22:, 2], s=50)
-        gt_ax.scatter(p2[22:, 0], p2[22:, 1], p2[22:, 2], s=50)
+        pred_ax.scatter(p1[22:, 0], p1[22:, 1], p1[22:, 2], s=10)
+        gt_ax.scatter(p2[22:, 0], p2[22:, 1], p2[22:, 2], s=10)
 
         for line in line_between_point:
             i = line[0]

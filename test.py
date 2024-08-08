@@ -379,7 +379,7 @@ def evaluate_prediction(
     gt_root_angle = body_param["root_orient"]
 
     predicted_root_angle = predicted_angle[:, :3]
-    predicted_angle = predicted_angle[:, 3:]
+    predicted_angle = predicted_angle[:, 3:66]
 
     upper_index = [3, 6, 9, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]
     lower_index = [0, 1, 2, 4, 5, 7, 8, 10, 11]
