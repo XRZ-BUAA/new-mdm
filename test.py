@@ -176,7 +176,7 @@ def non_overlapping_test(
         #     sparse_splits.append(sub_sparse)
         #     gt_splits.append(sub_gt)
         #     count += stride
-        while count + args.pre_motion_length <= num_frames:
+        while count + args.pre_motion_length < num_frames:
             sub_sparse = sparse_original[
                          :, count: count + args.pre_motion_length
                          ]
@@ -230,8 +230,6 @@ def non_overlapping_test(
             dim=0,
         )
 
-        print("Sparse Per Batch Shape")
-        print(sparse_per_batch.shape)
         # print("GT Per Batch Shape")
         # print(gt_per_batch.shape)
         assert sparse_per_batch.shape[0] == gt_per_batch.shape[0]
@@ -298,8 +296,6 @@ def non_overlapping_test(
             sample_split = sample[:, -args.predict_length:, :].clone().detach()
 
         sample_split = sample_split.reshape(-1, args.motion_nfeat).cpu().float()
-        print("sample_split Shape")
-        print(sample_split.shape)
 
         # if flag_index is not None and step_index == n_steps - 1:
         #     last_batch = sample[-1]
