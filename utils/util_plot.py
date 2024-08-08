@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 from utils import utils_transform
+from mpl_toolkits.mplot3d import Axes3D
+
 
 line_between_point = [
     # 身体关节
