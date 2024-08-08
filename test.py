@@ -128,7 +128,7 @@ def non_overlapping_test(
         sample_fn,
         dataset,
         model,
-        num_per_batch=256
+        num_per_batch=1
 ):
     gt_data, sparse_original, body_param, head_motion, filename = (
         data[0].unsqueeze(0),
@@ -189,8 +189,12 @@ def non_overlapping_test(
         gt_splits = [sub_gt]
 
     n_steps = len(sparse_splits) // num_per_batch
+
     if len(sparse_splits) % num_per_batch > 0:
         n_steps += 1
+
+    print("n_steps")
+    print(n_steps)
 
     if args.fix_noise:
         # fix noise seed for every frame
@@ -210,6 +214,7 @@ def non_overlapping_test(
             dim=0,
         )
 
+
         gt_per_batch = torch.cat(
             gt_splits[
                 step_index * num_per_batch: (step_index + 1) * num_per_batch
@@ -217,8 +222,8 @@ def non_overlapping_test(
             dim=0,
         )
 
-        # print("Sparse Per Batch Shape")
-        # print(sparse_per_batch.shape)
+        print("Sparse Per Batch Shape")
+        print(sparse_per_batch.shape)
         # print("GT Per Batch Shape")
         # print(gt_per_batch.shape)
         assert sparse_per_batch.shape[0] == gt_per_batch.shape[0]
@@ -285,6 +290,8 @@ def non_overlapping_test(
             sample_split = sample[:, -args.predict_length:, :].clone().detach()
 
         sample_split = sample_split.reshape(-1, args.motion_nfeat).cpu().float()
+        print("sample_split Shape")
+        print(sample_split.shape)
 
         # if flag_index is not None and step_index == n_steps - 1:
         #     last_batch = sample[-1]
