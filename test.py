@@ -15,7 +15,7 @@ from model.networks import PureMLP
 from human_body_prior.body_model.body_model import BodyModel as BM
 from human_body_prior.tools.rotation_tools import aa2matrot, local2global_pose
 from utils import utils_transform
-from utils.util_plot import plot_skeleton_by_pos
+from utils.util_plot import plot_skeleton_by_pos, plot_animation_by_pos
 from utils.metrics import get_metric_function
 
 device = torch.device("cuda")
@@ -323,20 +323,16 @@ def evaluate_prediction(
     body_param,
     fps,
     filename,
+    ani_save
 ):
     motion_pred = sample.squeeze().cuda()
 
-    print("motion_pre Shape")
-    print(motion_pred.shape)
     # Get the  prediction from the model
     model_rot_input = (
         utils_transform.sixd2aa(motion_pred.reshape(-1, 6).detach())
         .reshape(motion_pred.shape[0], -1)
         .float()
     )
-
-    print("model_rot_input Shape")
-    print(model_rot_input.shape)
 
     T_head2world = head_motion.clone().cuda()
     t_head2world = T_head2world[:, :3, 3].clone()
@@ -350,16 +346,8 @@ def evaluate_prediction(
         }
     ).Jtr
 
-    print("body_pose_local Shape")
-    print(body_pose_local.shape)
-
     # Get the offset in global coordiante system between head and body_world.
     t_head2root = -body_pose_local[:, 15, :]
-
-    print("t_head2root Shape")
-    print(t_head2root.shape)
-    print("t_head2world Shape")
-    print(t_head2world.shape)
 
     t_root2world = t_head2root + t_head2world.cuda()
 
@@ -385,7 +373,7 @@ def evaluate_prediction(
     gt_position = gt_body.Jtr[:, :52, :]
 
     # 可视化
-    plot_skeleton_by_pos(predicted_position, gt_position)
+    plot_animation_by_pos(predicted_position, gt_position, save_path=ani_save)
 
     gt_angle = body_param["pose_body"]
     gt_root_angle = body_param["root_orient"]
@@ -415,6 +403,7 @@ def evaluate_prediction(
 
     torch.cuda.empty_cache()
     return eval_log
+
 
 def main():
     args = sample_args()
@@ -456,6 +445,8 @@ def main():
 
         sample = torch.cat(output, dim=0)
 
+        ani_save = os.path.join(args.output_dir, str(sample_index) + '.mp4')
+
         instance_log = evaluate_prediction(
             args,
             all_metrics,
@@ -466,6 +457,7 @@ def main():
             body_param,
             fps,
             filename,
+            ani_save
         )
         for key in instance_log:
             log[key] += instance_log[key]

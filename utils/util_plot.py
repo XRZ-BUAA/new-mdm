@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 from utils import utils_transform
 from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.animation import FuncAnimation
 
 
 line_between_point = [
@@ -68,13 +69,17 @@ def plot_skeleton_by_pos(pred_jtr, gt_jtr):
         gt_jtr = gt_jtr[0].cpu()
     p1_all = pred_jtr.cpu()
     p2_all = gt_jtr.cpu()
-    for i in range(p1_all.shape[0]):
-        p1 = p1_all[i]
-        p2 = p2_all[i]
+    for frame in range(p1_all.shape[0]):
+        p1 = p1_all[frame]
+        p2 = p2_all[frame]
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        ax.scatter(p1[:, 0], p1[:, 1], p1[:, 2])
-        ax.scatter(p2[:, 0], p2[:, 1], p2[:, 2])
+
+        ax.scatter(p1[:22, 0], p1[:22, 1], p1[:22, 2], s=100)
+        ax.scatter(p2[:22, 0], p2[:22, 1], p2[:22, 2], s=100)
+
+        ax.scatter(p1[22:, 0], p1[22:, 1], p1[22:, 2], s=50)
+        ax.scatter(p2[22:, 0], p2[22:, 1], p2[22:, 2], s=50)
         for line in line_between_point:
             i = line[0]
             j = line[1]
@@ -87,3 +92,46 @@ def plot_skeleton_by_pos(pred_jtr, gt_jtr):
 
         # show
         plt.show()
+
+
+def plot_animation_by_pos(pred_jtr, gt_jtr, save_path):
+    if len(pred_jtr.shape) > 3:  # (bs, seq, 22, 3)
+        pred_jtr = pred_jtr[0].cpu()
+        gt_jtr = gt_jtr[0].cpu()
+    p1_all = pred_jtr.cpu()     # 预测关节位置
+    p2_all = gt_jtr.cpu()       # 真实关节位置
+
+    num_frames = p1_all.shape[0]    # 帧数
+
+    fig = plt.figure()
+    gt_ax = fig.add_subplot(111, projection='3d')
+    pred_ax = fig.add_subplot(122, projection='3d')
+
+    for ax in [pred_ax, gt_ax]:
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+
+    def update(frame):
+        p1 = p1_all[frame]
+        p2 = p2_all[frame]
+
+        # 清除当前图形以便重新绘制
+        pred_ax.cla()
+        gt_ax.cla()
+
+        pred_ax.scatter(p1[:22, 0], p1[:22, 1], p1[:22, 2], c='r', s=100, label='Predicted Motion')
+        gt_ax.scatter(p2[:22, 0], p2[:22, 1], p2[:22, 2], s=100, c='b', label='Ground Truth')
+
+        pred_ax.scatter(p1[22:, 0], p1[22:, 1], p1[22:, 2], s=50)
+        gt_ax.scatter(p2[22:, 0], p2[22:, 1], p2[22:, 2], s=50)
+
+        for line in line_between_point:
+            i = line[0]
+            j = line[1]
+            pred_ax.plot([p1[i, 0], p1[j, 0]], [p1[i, 1], p1[j, 1]], [p1[i, 2], p1[j, 2]], 'r-')
+            gt_ax.plot([p2[i, 0], p2[j, 0]], [p2[i, 1], p2[j, 1]], [p2[i, 2], p2[j, 2]], 'b-')
+
+    ani = FuncAnimation(fig, update, frames=num_frames, repeat=False)
+    ani.save(save_path, writer='ffmpeg', fps=60)
+    plt.show()
