@@ -104,7 +104,7 @@ def plot_animation_by_pos(pred_jtr, gt_jtr, save_path):
     num_frames = p1_all.shape[0]    # 帧数
 
     fig = plt.figure()
-    gt_ax = fig.add_subplot(111, projection='3d')
+    gt_ax = fig.add_subplot(121, projection='3d')
     pred_ax = fig.add_subplot(122, projection='3d')
     # # 设置视角
     # gt_ax.view_init(elev=20, azim=30)
